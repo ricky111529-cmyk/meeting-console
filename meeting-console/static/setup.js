@@ -108,7 +108,9 @@ function renderModels() {
 
 // ---------------------------------------------------------------- 6단계
 function renderHowto() {
-  $('#ics-howto').innerHTML = (SETUP.howto || []).map((h) => `<li>${esc(h)}</li>`).join('');
+  $('#ics-howto').innerHTML = (SETUP.howto || []).map((g, i) =>
+    `<details${i === 0 ? ' open' : ''}><summary>${esc(g.name)}</summary><ol>` +
+    (g.steps || []).map((h) => `<li>${esc(h)}</li>`).join('') + `</ol></details>`).join('');
 }
 
 // ---------------------------------------------------------------- 7단계

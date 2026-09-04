@@ -64,10 +64,11 @@
 
   <section class="card" id="step-6">
     <h2>6. 캘린더 연결</h2>
-    <ol id="ics-howto"></ol>
+    <p class="hint">ICS(iCal) 주소를 주는 캘린더면 어느 것이든 됩니다. 쓰는 서비스를 펼쳐 따라 하세요.</p>
+    <div id="ics-howto"></div>
     <p class="hint">회의실(LOCATION)이 잡힌 일정만 녹음합니다. 제목에 <code>[녹음]</code> 을 넣으면
       회의실이 없어도 녹음합니다.</p>
-    <input id="ics" type="password" placeholder="https://calendar.google.com/... (비공개 iCal 주소)" size="60">
+    <input id="ics" type="password" placeholder="https://... 또는 webcal://... (비공개 iCal/ICS 주소)" size="60">
     <button id="do-ics" class="primary">확인하고 저장</button>
     <div id="ics-out"></div>
     <button class="primary" data-pass="6">다음</button>
