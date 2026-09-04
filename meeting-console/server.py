@@ -1370,7 +1370,8 @@ def enroll(folder: str, names: dict, save_to_registry: bool = True) -> dict:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     backup = BACKUP_DIR / f"{folder}-transcript-speakers.md"
     shutil.copy2(spk_out, backup)      # 1차 실행 전에 남긴다. 도중에 서버가 꺼져도 되돌릴 것이 있다
-    set_job(folder, kind="등록", state="running", started=ms.now_iso(),
+    set_job(folder, kind="등록", state="running", started=ms.now_iso(), stage=1, stages=2,
+            stage_label="1/2 목소리를 등록부에 저장하며 다시 분리하는 중",
             message="화자 분리를 다시 돌리는 중입니다 (수 분). 이 화면을 닫아도 계속됩니다")
 
     def worker():
@@ -1390,6 +1391,7 @@ def enroll(folder: str, names: dict, save_to_registry: bool = True) -> dict:
                 # 1차 결과를 잃지 않게 백업을 1차 결과로 갱신하고 2차를 돌린다. 2차가 깨지면 되돌린다.
                 shutil.copy2(spk_out, backup)
                 fh.write("\n# 2차: --enroll 없이 다시 돌려 등록부 대조로 전원 이름을 붙인다\n")
+                set_job(folder, stage=2, stage_label="2/2 등록부와 대조해 전원에게 이름을 붙이는 중")
                 try:
                     code2 = run_diarize(fh, audios[0], vtt, spk_out, n_speakers)
                 except subprocess.TimeoutExpired:
@@ -1463,7 +1465,8 @@ def resplit(folder: str, n: int) -> dict:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     backup = BACKUP_DIR / f"{folder}-transcript-speakers.md"
     shutil.copy2(spk_out, backup)
-    set_job(folder, kind="재분리", state="running", started=ms.now_iso(),
+    set_job(folder, kind="재분리", state="running", started=ms.now_iso(), stage=1, stages=1,
+            stage_label=f"화자 {n}명으로 다시 분리하는 중",
             message=f"화자 {n}명으로 다시 분리하는 중입니다 (수 분). 이 화면을 닫아도 계속됩니다")
 
     def worker():

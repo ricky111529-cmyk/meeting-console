@@ -277,7 +277,7 @@ function renderSpeakerLine() {
     '<input id="rs-n" type="number" min="1" max="20" value="' + SPK.speaker_count + '"' +
     (running ? ' disabled' : '') + '> ' +
     '<button id="rs-go" class="small"' + (running ? ' disabled' : '') + '>이 수로 다시 분리</button> ' +
-    '<span class="meta" id="rs-msg">' + esc(e.message || '') + '</span>' +
+    '<span class="meta" id="rs-msg">' + jobHtml(e) + '</span>' +
     (SPK.resplit_reasons || []).map((r) => '<div class="meta">' + esc(r) + '</div>').join('') +
     '<div class="meta">다시 분리하면 이름이 붙어 있던 라벨을 잃을 수 있습니다 (클러스터가 달라지면 ' +
     '등록부 대조 결과가 바뀝니다). 실패하면 이전 분리본으로 되돌립니다. 수 분 걸립니다.</div></div>';
@@ -316,7 +316,7 @@ function openDrawer(label) {
       '<span class="meta">(끄면 이 회의에만 이름이 붙고 다음 회의에는 붙지 않습니다. ' +
       '이 회의에서 다시 분리를 돌리면 화자 수가 같을 때 자동으로 다시 붙입니다)</span></label>' +
       '<button id="dr-go" class="primary"' + (running ? ' disabled' : '') + '>저장</button>' +
-      '<div class="meta" id="dr-msg">' + esc((SPK.enroll || {}).message || '') + '</div>' +
+      '<div class="meta" id="dr-msg">' + jobHtml(SPK.enroll || {}) + '</div>' +
       '<div class="meta">등록부에 저장하면 화자 분리를 두 번 다시 돌립니다 (수 분). 저장하지 않으면 ' +
       '분리본과 초안의 라벨만 바로 바꿉니다. 초안은 다시 만들지 않습니다.</div>' +
       '<button id="dr-registry" class="small">등록부 관리</button>');
@@ -353,16 +353,36 @@ function openDrawer(label) {
 
 // 등록·재분리는 서버 스레드에서 돈다. 화면을 닫아도 계속되고 다시 열면 상태가 이어진다.
 // 서버가 도중에 꺼지면 다음 기동 때 직전 분리본으로 되돌리고 "중단됨"으로 남는다 (스펙 7절).
+// 진행 표시. 화자 분리는 몇 %인지 알 수 없어(sherpa-onnx 가 진행률을 내지 않는다) 단계와 경과 시간만
+//  정직하게 보인다. 막대는 끝난 단계만큼 채우고 진행 중 단계는 줄무늬로 움직인다.
+let JOB_TICK = null;
+function fmtElapsed(started) {
+  const s = Math.max(0, Math.round((Date.now() - new Date(started).getTime()) / 1000));
+  return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`;
+}
+function jobHtml(e) {
+  if (!e || e.state !== 'running') return esc((e && e.message) || '');
+  const stages = e.stages || 1, stage = e.stage || 1;
+  const pct = Math.round((stage - 1) / stages * 100);
+  return '<div class="job"><div class="bar busy"><i style="width:' + pct + '%"></i></div>' +
+    '<div class="meta"><span>' + esc(e.stage_label || e.message || '진행 중') + '</span> · 경과 ' +
+    '<span class="job-elapsed" data-started="' + esc(e.started || '') + '">' + fmtElapsed(e.started) + '</span>' +
+    ' · 이 화면을 닫아도 계속됩니다</div></div>';
+}
+function tickElapsed() {
+  document.querySelectorAll('.job-elapsed').forEach((el) => { el.textContent = fmtElapsed(el.dataset.started); });
+}
 function pollJob(folder) {
-  clearInterval(SPK_TIMER);
+  clearInterval(SPK_TIMER); clearInterval(JOB_TICK);
+  JOB_TICK = setInterval(tickElapsed, 1000);
   SPK_TIMER = setInterval(async () => {
-    if (!CUR || CUR.folder !== folder) { clearInterval(SPK_TIMER); return; }
+    if (!CUR || CUR.folder !== folder) { clearInterval(SPK_TIMER); clearInterval(JOB_TICK); return; }
     const r = await req('/api/speakers?folder=' + encodeURIComponent(folder));
     const e = r.enroll || {};
-    if ($('#rs-msg')) $('#rs-msg').textContent = e.message || '';
-    if ($('#dr-msg')) $('#dr-msg').textContent = e.message || '';
+    if ($('#rs-msg')) $('#rs-msg').innerHTML = jobHtml(e);
+    if ($('#dr-msg')) $('#dr-msg').innerHTML = jobHtml(e);
     if (e.state !== 'running') {
-      clearInterval(SPK_TIMER);
+      clearInterval(SPK_TIMER); clearInterval(JOB_TICK);
       await reloadDetail();
       loadRegistry();
       if ($('#rs-msg')) $('#rs-msg').textContent = e.message || '';

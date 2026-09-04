@@ -134,3 +134,10 @@ button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280;
 .log { max-height: 260px; overflow: auto; background: #0f1115; color: #d7dbe0;
        border-radius: 6px; padding: 8px; margin: 8px 0; }
 #setup li { margin-bottom: 3px; }
+
+/* 분리 작업 진행 표시 (단계 + 경과. 퍼센트는 알 수 없어 단계 단위로만 채운다) */
+.job { display: block; margin: 6px 0; }
+.job .bar { height: 6px; background: #e6e6e6; border-radius: 3px; overflow: hidden; }
+.job .bar i { display: block; height: 100%; background: #3b6fd6; transition: width .5s; min-width: 4px; }
+.job .bar.busy { background-image: repeating-linear-gradient(45deg, rgba(59,111,214,.25) 0 8px, transparent 8px 16px); background-size: 32px 100%; animation: job-move 1s linear infinite; }
+@keyframes job-move { to { background-position: 32px 0; } }
