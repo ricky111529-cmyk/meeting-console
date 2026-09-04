@@ -1,0 +1,136 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.55 -apple-system, "Apple SD Gothic Neo", sans-serif;
+       background: #f6f7f9; color: #1b1f24; }
+header { display: flex; justify-content: space-between; align-items: baseline;
+         padding: 14px 20px; background: #fff; border-bottom: 1px solid #e3e6ea; position: sticky; top: 0; z-index: 5; }
+h1 { font-size: 17px; margin: 0; }
+h2 { font-size: 14px; margin: 0 0 10px; }
+main { padding: 16px 20px 60px; max-width: 1180px; }
+.card { background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+.meta, .hint { color: #6b7280; font-size: 12px; }
+.hint { display: inline-block; }
+button { font: inherit; padding: 5px 12px; border: 1px solid #cbd2d9; background: #fff;
+         border-radius: 6px; cursor: pointer; }
+button:hover { background: #f0f2f5; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: #1b64da; border-color: #1b64da; color: #fff; }
+button.danger { border-color: #d64545; color: #b62222; }
+button.small { padding: 2px 8px; font-size: 12px; }
+.row-btn { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+th { color: #6b7280; font-weight: 500; font-size: 12px; }
+tr.click:hover { background: #f2f6ff; cursor: pointer; }
+.group { margin-bottom: 12px; }
+.group h3 { font-size: 13px; margin: 0 0 4px; display: flex; gap: 6px; align-items: center; }
+.badge { background: #eef1f5; border-radius: 10px; padding: 0 7px; font-size: 11px; color: #4b5563; }
+.rec { color: #b62222; font-weight: 600; }
+.dim { color: #9aa2ad; }
+code { background: #f1f3f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 12px;
+      max-height: 340px; overflow: auto; }
+.hidden { display: none !important; }
+#overlay { position: fixed; inset: 0; background: rgba(20,24,30,.45); display: flex;
+           align-items: center; justify-content: center; z-index: 10; }
+#detail { background: #fff; width: min(1180px, 96vw); height: 92vh; border-radius: 10px;
+          padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+#detail-head { display: flex; justify-content: space-between; align-items: flex-start; }
+#detail-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
+.pane { display: flex; flex-direction: column; min-height: 0; }
+.paneL { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+textarea { flex: 1; width: 100%; font: 12px/1.6 ui-monospace, Menlo, monospace;
+           padding: 10px; border: 1px solid #d7dbe0; border-radius: 6px; resize: none; }
+.tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.tab { font-size: 12px; padding: 3px 9px; }
+.tab.on { background: #1b64da; color: #fff; border-color: #1b64da; }
+.tabbody { flex: 1; overflow: auto; border: 1px solid #eef0f3; border-radius: 6px; padding: 8px; min-height: 0; }
+input { font: inherit; padding: 4px 8px; border: 1px solid #d7dbe0; border-radius: 5px; }
+.grid4 { display: grid; grid-template-columns: 120px 1fr 1fr 1.4fr; gap: 8px; margin-top: 6px; }
+.grid4 label { display: flex; flex-direction: column; font-size: 12px; color: #6b7280; gap: 3px; }
+#detail-foot { display: flex; gap: 8px; align-items: center; }
+#d-msg { font-size: 12px; color: #1b64da; }
+#exclude-box { border-top: 1px solid #eef0f3; padding-top: 8px; display: flex; gap: 10px;
+               align-items: center; flex-wrap: wrap; font-size: 12px; }
+.chk { display: flex; gap: 5px; align-items: center; }
+.warn { background: #fff4e5; border: 1px solid #ffd8a8; color: #8a5300; padding: 6px 10px;
+        border-radius: 6px; font-size: 12px; margin-bottom: 4px; }
+.ok { color: #157347; }
+.no { color: #b62222; }
+.marks { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px;
+         margin-bottom: 6px; max-height: 62px; overflow: auto; }
+.marks button.jump { font-family: ui-monospace, Menlo, monospace; }
+.spk { border: 1px solid #eef0f3; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.spk label { margin-right: 8px; }
+.spk .chk { display: inline-flex; }
+.clips { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+audio { height: 32px; }
+
+/* 화자 등록 서랍 (스펙 8절 결정 1). 열리면 초안 · 근거 · 서랍 3단이 된다 */
+#detail-body:has(#drawer:not(.hidden)) { grid-template-columns: 1fr 1fr 320px; }
+#drawer { border: 1px solid #d7dbe0; border-radius: 6px; padding: 10px; gap: 8px;
+          overflow: auto; font-size: 13px; background: #fbfcfd; }
+#drawer.hidden { display: none; }
+.drawer-head { display: flex; gap: 8px; align-items: center; }
+.drawer-head button { margin-left: auto; }
+#drawer .clips { flex-direction: column; align-items: stretch; }
+#drawer label { display: block; margin: 6px 0; }
+.clip { border-bottom: 1px solid #eef0f3; padding-bottom: 4px; }
+button.chip { font: inherit; font-family: ui-monospace, Menlo, monospace; cursor: pointer;
+              background: #e7f0ff; border: 1px solid #b9d1ff; color: #1b64da;
+              border-radius: 4px; padding: 0 4px; }
+button.chip.named { background: #eef7ee; border-color: #c3e0c3; color: #157347; }
+button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280; cursor: not-allowed; }
+.spk-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px;
+            border: 1px solid #eef0f3; border-radius: 6px; padding: 6px 10px; margin-bottom: 6px; }
+.spk-line input { width: 60px; }
+.spk-line .meta { flex-basis: 100%; }
+#reg-body .group { border-top: 1px solid #eef0f3; margin-top: 8px; padding-top: 8px; }
+
+/* ---------------- 캘린더 페이지 (스펙 5-2) ---------------- */
+#toptabs { display: flex; gap: 4px; padding: 8px 20px 0; background: #fff;
+           border-bottom: 1px solid #e3e6ea; }
+.toptab { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.toptab.on { background: #1b64da; border-color: #1b64da; color: #fff; }
+#card-week h2 { display: flex; gap: 6px; align-items: center; }
+#wk-range { font-size: 13px; }
+.wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; }
+.wkday { border: 1px solid #eef0f3; border-radius: 6px; padding: 6px; min-height: 120px;
+         display: flex; flex-direction: column; gap: 5px; }
+.wkday.today { border-color: #1b64da; background: #f7faff; }
+.wkhead { font-size: 12px; font-weight: 600; display: flex; gap: 4px; align-items: baseline; }
+.cell { border: 1px solid #dfe3e8; border-left-width: 3px; border-radius: 5px;
+        padding: 4px 6px; cursor: pointer; background: #fff; }
+.cell:hover { background: #f2f6ff; }
+.cell.dimcell { opacity: .55; }
+.cwhen { font-size: 11px; color: #6b7280; }
+.ctitle { font-size: 12px; font-weight: 500; word-break: break-word; }
+.cbadge { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.badge[class*="b-"] { color: #fff; }
+/* 8종을 색으로도 구분한다 (스펙 5-2). 왼쪽 테두리 색이 칸 단위 구분이다 */
+.b-not-target { background: #9aa2ad; }
+.b-planned    { background: #1b64da; }
+.b-recording  { background: #d62828; }
+.b-stt-wait   { background: #b06f00; }
+.b-draft-wait { background: #7b53c1; }
+/* 확인 필요는 사람이 손대야 하는 유일한 상태다. 확정(초록)과 같은 계열이면 눈으로 안 갈린다 */
+.b-review-wait{ background: #0d8ea8; }
+.b-approved   { background: #157347; }
+.b-missing    { background: #000; }
+.st-not-target { border-left-color: #9aa2ad; }
+.st-planned    { border-left-color: #1b64da; }
+.st-recording  { border-left-color: #d62828; }
+.st-stt-wait   { border-left-color: #b06f00; }
+.st-draft-wait { border-left-color: #7b53c1; }
+.st-review-wait{ border-left-color: #0d8ea8; }
+.st-approved   { border-left-color: #157347; }
+/* 놓친 녹음은 눈에 띄게 둔다. 이 상태가 화면에 남지 않으면 실패를 모른 채 지나간다 */
+.st-missing { border-left-color: #000; background: #fff1f1; border-color: #ffc9c9; }
+.miss { color: #b62222; }
+#d-cal table { max-width: 720px; }
+#d-cal th { width: 110px; }
+
+/* 설치 마법사 (스펙 5-5) */
+.toptabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+.log { max-height: 260px; overflow: auto; background: #0f1115; color: #d7dbe0;
+       border-radius: 6px; padding: 8px; margin: 8px 0; }
+#setup li { margin-bottom: 3px; }

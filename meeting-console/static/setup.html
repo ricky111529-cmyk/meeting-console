@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>회의 콘솔 설치</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>회의 콘솔 설치</h1>
+  <div class="meta">7단계입니다. 브라우저를 닫아도 통과한 단계는 남습니다.</div>
+</header>
+
+<nav id="steps" class="toptabs"></nav>
+
+<main id="setup">
+  <section class="card" id="step-1">
+    <h2>1. 시작</h2>
+    <ul>
+      <li>회의를 자동으로 녹음하고, 음성을 글로 옮기고, 회의 노트 초안까지 만드는 도구를 설치합니다</li>
+      <li>걸리는 시간은 10~30분입니다 (대부분 모델 내려받기)</li>
+      <li>디스크를 약 1.7GB 씁니다</li>
+      <li><b>오디오와 회의 내용은 이 맥을 떠나지 않습니다.</b> 초안 생성은 로컬에서 도는 Claude Code 가 합니다</li>
+      <li><b>녹음 전에 참석자 동의를 받으세요.</b> 마이크만 녹음되고 상대방 목소리는 담기지 않습니다</li>
+      <li>회의 폴더는 <code id="mdir">docs/meetings/</code> 아래에 생깁니다. 이 이름은 녹음·STT·노트 스크립트가
+        공유하는 경로라 바꾸지 않습니다 (바꾸면 파이프라인 전체의 경로 가정이 흔들립니다)</li>
+    </ul>
+    <button class="primary" data-pass="1">읽었습니다. 다음</button>
+  </section>
+
+  <section class="card" id="step-2">
+    <h2>2. 시스템 점검</h2>
+    <div id="sys">확인 중</div>
+    <button id="sys-again" class="small">다시 확인</button>
+    <button class="primary" data-pass="2" id="sys-next" disabled>다음</button>
+  </section>
+
+  <section class="card" id="step-3">
+    <h2>3. 도구 설치</h2>
+    <div id="plan"></div>
+    <button id="do-install" class="primary">없는 것 설치</button>
+    <button class="small" data-skip="3">건너뛰기</button>
+    <pre id="install-log" class="log"></pre>
+    <button class="primary" data-pass="3">다음</button>
+  </section>
+
+  <section class="card" id="step-4">
+    <h2>4. 모델 내려받기</h2>
+    <div id="models"></div>
+    <button id="do-models" class="primary">내려받기</button>
+    <pre id="models-log" class="log"></pre>
+    <button class="primary" data-pass="4">다음</button>
+  </section>
+
+  <section class="card" id="step-5">
+    <h2>5. 마이크 권한</h2>
+    <p class="hint">권한은 프로세스가 아니라 <b id="mic-app">앱</b>에 붙습니다. 포그라운드와 launchd
+      두 경로를 각각 3초 녹음해 실측으로 판정합니다. 녹음된 파일은 판정 직후 지웁니다.</p>
+    <button id="do-mic" class="primary">마이크 확인</button>
+    <button id="mic-pref" class="small">시스템 설정 열기</button>
+    <div id="mic"></div>
+    <button class="primary" data-pass="5">다음</button>
+  </section>
+
+  <section class="card" id="step-6">
+    <h2>6. 캘린더 연결</h2>
+    <ol id="ics-howto"></ol>
+    <p class="hint">회의실(LOCATION)이 잡힌 일정만 녹음합니다. 제목에 <code>[녹음]</code> 을 넣으면
+      회의실이 없어도 녹음합니다.</p>
+    <input id="ics" type="password" placeholder="https://calendar.google.com/... (비공개 iCal 주소)" size="60">
+    <button id="do-ics" class="primary">확인하고 저장</button>
+    <div id="ics-out"></div>
+    <button class="primary" data-pass="6">다음</button>
+  </section>
+
+  <section class="card" id="step-7">
+    <h2>7. 완료</h2>
+    <div id="finish">확인 중</div>
+    <p class="hint">메뉴바 앱은 자동으로 등록하지 않습니다. 아래에서 고르세요.</p>
+    <button id="do-menubar" class="primary">메뉴바 앱 띄우기</button>
+    <button id="do-login-on" class="small">로그인할 때 자동 실행하기</button>
+    <button id="do-login-off" class="small">자동 실행 끄기</button>
+    <div id="menubar-out"></div>
+    <button id="go-console" class="primary">제어판으로</button>
+  </section>
+</main>
+
+<footer class="meta">
+  <button id="reset" class="small">진행 상태 초기화</button>
+</footer>
+<script src="/static/setup.js"></script>
+</body>
+</html>

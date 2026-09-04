@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  미팅 녹음 자동 시작 launchd 에이전트 (1분마다 캘린더 확인)
+
+  설치:
+    cp scripts/com.meeting-console.meeting-recorder.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.meeting-console.meeting-recorder.plist
+
+  중지:
+    launchctl unload ~/Library/LaunchAgents/com.meeting-console.meeting-recorder.plist
+
+  로그: .claude/calendar-recorder/watch.log
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.meeting-console.meeting-recorder</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__UV__</string>
+    <string>run</string>
+    <string>--quiet</string>
+    <string>__REPO__/scripts/calendar-watch.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__REPO__</string>
+
+  <key>StartInterval</key>
+  <integer>60</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:__UVBIN__</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__REPO__/.claude/calendar-recorder/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__REPO__/.claude/calendar-recorder/launchd.err.log</string>
+</dict>
+</plist>

@@ -1,0 +1,5 @@
+# 콘솔 런타임 산물 (머신 로컬)
+.state/
+logs/
+__pycache__/
+dist/

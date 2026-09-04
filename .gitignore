@@ -1,0 +1,9 @@
+docs/meetings/*/
+!docs/meetings/.gitkeep
+meeting-console/.state/
+meeting-console/logs/
+__pycache__/
+scripts/bin/
+scripts/models/
+.claude/calendar-recorder/
+.claude/voice-registry/

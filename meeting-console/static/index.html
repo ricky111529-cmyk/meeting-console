@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회의 콘솔</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>회의 콘솔</h1>
+  <div class="meta"><span id="clock">-</span> · <span id="waiting">확인 필요 -</span></div>
+</header>
+
+<!-- 첫 화면은 캘린더다 (스펙 8절 결정 4). 제어판은 두 번째 탭으로 내렸다 -->
+<nav id="toptabs">
+  <button class="toptab on" data-panel="calendar">캘린더</button>
+  <button class="toptab" data-panel="control">제어판</button>
+</nav>
+
+<main id="panel-calendar">
+  <section class="card" id="card-review">
+    <h2>확인 필요 <span id="review-n" class="meta"></span></h2>
+    <p class="hint">사람이 할 일은 이것뿐입니다. 나머지 처리 단계는 제어판 탭의 「처리 상태」에 있습니다.</p>
+    <div id="review-list">불러오는 중</div>
+  </section>
+
+  <section class="card" id="card-week">
+    <h2>
+      <button id="wk-prev" class="small">◀ 지난 주</button>
+      <span id="wk-range">-</span>
+      <button id="wk-next" class="small">다음 주 ▶</button>
+      <button id="wk-this" class="small">이번 주로</button>
+      <button id="wk-reload" class="small">다시 조회</button>
+    </h2>
+    <div id="wk-sum" class="meta">불러오는 중</div>
+    <div id="wk-err"></div>
+    <div id="wk-grid"></div>
+  </section>
+</main>
+
+<main id="panel-control" class="hidden">
+  <section class="card" id="card-now">
+    <h2>지금 상태</h2>
+    <div id="now">불러오는 중</div>
+    <div class="row-btn">
+      <button id="btn-stop" class="danger">지금 녹음 중지</button>
+      <button id="btn-auto">자동 녹음</button>
+      <span class="hint">중지는 <code>kill -INT</code>로 보냅니다. 강제 종료하면 파일이 열리지 않습니다.</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>오늘 일정 <button id="btn-today" class="small">다시 조회</button></h2>
+    <div id="today">불러오는 중</div>
+  </section>
+
+  <section class="card" id="card-queue-review">
+    <h2>확인 필요</h2>
+    <div id="queue-review">불러오는 중</div>
+  </section>
+
+  <section class="card">
+    <h2>처리 상태</h2>
+    <p class="hint">회의 폴더가 지금 어느 단계에 있는지를 보여줍니다. 사람이 할 일은 위 「확인 필요」뿐입니다.</p>
+    <div id="queue">불러오는 중</div>
+  </section>
+
+  <section class="card">
+    <h2>목소리 등록부 <button id="reg-reload" class="small">다시 읽기</button></h2>
+    <p class="hint">이름 → 목소리 임베딩. 여기 있는 이름이 다음 회의부터 자동으로 붙습니다.
+      잘못 붙은 이름은 여기서 지웁니다. 지운 것은 <b>다음 분리부터</b> 반영되고, 이미 이름이 붙은
+      과거 분리본은 그대로 남습니다. 화자 등록은 검수 화면의 분리본에서 합니다.</p>
+    <div id="reg-body">불러오는 중</div>
+  </section>
+
+  <section class="card">
+    <h2>진단</h2>
+    <div id="diag">불러오는 중</div>
+  </section>
+</main>
+
+<div id="overlay" class="hidden">
+  <div id="detail">
+    <div id="detail-head">
+      <div>
+        <h2 id="d-title">-</h2>
+        <div class="meta" id="d-meta">-</div>
+      </div>
+      <button id="d-close" class="small">닫기</button>
+    </div>
+    <div id="d-warn"></div>
+    <div id="spk-line"></div>
+    <!-- 폴더가 없는 일정을 눌렀을 때. 캘린더 정보와 예상 폴더명만 보여준다 (스펙 3-6) -->
+    <div id="d-cal" class="hidden"></div>
+    <div id="detail-body">
+      <div class="pane">
+        <label class="paneL">초안 (직접 고칠 수 있습니다)</label>
+        <!-- [?] 표기와 (미기입) 칸을 세어 눈에 띄게 띄운다 (스펙 5-2). 누르면 그 자리로 간다 -->
+        <div id="d-marks" class="marks"></div>
+        <textarea id="d-draft" spellcheck="false"></textarea>
+      </div>
+      <div class="pane">
+        <div class="tabs">
+          <button class="tab on" data-tab="speakers">화자 분리본</button>
+          <button class="tab" data-tab="attendees">참석자</button>
+          <button class="tab" data-tab="search">원문 검색</button>
+          <button class="tab" data-tab="log">실행 로그</button>
+        </div>
+        <div id="t-speakers" class="tabbody"><pre></pre></div>
+        <div id="t-attendees" class="tabbody hidden"><pre></pre></div>
+        <div id="t-search" class="tabbody hidden">
+          <input id="q" placeholder="원문에서 찾을 말">
+          <div id="q-hits"></div>
+        </div>
+        <div id="t-log" class="tabbody hidden"><pre></pre></div>
+      </div>
+      <!-- 화자 등록 서랍. 분리본의 SPEAKER_NN 칩을 누르면 초안 옆에 나란히 열린다 (스펙 8절 결정 1) -->
+      <aside id="drawer" class="pane hidden"></aside>
+    </div>
+    <div id="index-row">
+      <strong>인덱스 행 후보</strong>
+      <div class="grid4">
+        <label>종류<input id="ir-0"></label>
+        <label>주제<input id="ir-1"></label>
+        <label>관련 프로젝트<input id="ir-2"></label>
+        <label>핵심 결정<input id="ir-3"></label>
+      </div>
+    </div>
+    <div id="detail-foot">
+      <button id="b-approve" class="primary">확정</button>
+      <button id="b-exclude">제외</button>
+      <button id="b-regen">다시 생성</button>
+      <button id="b-later" class="small">나중에</button>
+      <span id="d-msg"></span>
+    </div>
+    <div id="exclude-box" class="hidden">
+      <label>제외 사유 <input id="x-reason" placeholder="예: 개인 면접이었다"></label>
+      <label class="chk"><input type="checkbox" id="x-del"> 폴더도 삭제 (오디오 포함, 되돌릴 수 없음)</label>
+      <div id="x-confirm-box" class="hidden">
+        <label>삭제하려면 폴더명을 그대로 입력하세요: <code id="x-folder"></code>
+          <input id="x-confirm" autocomplete="off"></label>
+      </div>
+      <button id="x-go">제외 실행</button>
+    </div>
+  </div>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
