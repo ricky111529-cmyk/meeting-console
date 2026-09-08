@@ -291,6 +291,20 @@ def main() -> int:
                 pass                                # 위치 기억이 안 돼도 앱은 정상 동작
 
         def refresh(self, force: bool = False):
+            # 2026-09-08: 녹음이 끝난 뒤에도 제목이 「남은 3분」으로 16시간 굳어 있었다. 프로세스는
+            #  살아 있었고 원인은 못 잡았다. 그래서 매 갱신마다 심박 파일을 찍고 예외를 파일에 남긴다.
+            #  다음에 굳으면 심박 시각으로 "타이머가 죽었는지, 돌았는데 값이 틀린지"를 가른다.
+            try:
+                self._refresh(force)
+                ms.STATE_DIR.mkdir(parents=True, exist_ok=True)
+                (ms.STATE_DIR / "menubar-heartbeat").write_text(
+                    f"{ms.now_iso()} {self.title}\n", encoding="utf-8")
+            except Exception as exc:                 # noqa: BLE001
+                ms.LOGS.mkdir(parents=True, exist_ok=True)
+                with (ms.LOGS / "menubar.log").open("a", encoding="utf-8") as fh:
+                    fh.write(f"{ms.now_iso()} refresh 실패: {exc!r}\n")
+
+        def _refresh(self, force: bool = False):
             self.pin_position()
             slow_due = force or (time.time() - self._last_slow) >= SLOW_SEC
             if slow_due:
