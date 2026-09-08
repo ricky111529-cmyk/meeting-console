@@ -29,6 +29,8 @@ let STATE = null, CUR = null;
 function renderNow(s) {
   $('#clock').textContent = s.now;
   $('#waiting').textContent = `확인 필요 ${s.waiting}건`;
+  $('#todo-open').textContent = `안 한 일 ${s.todo_open ?? '-'}건`;
+  $('#todo-badge').textContent = s.todo_open ? s.todo_open : '';
   const r = s.recording;
   if (r) {
     $('#now').innerHTML = `<div class="rec">🔴 녹음 중 · ${esc(r.title)}</div>
@@ -605,6 +607,7 @@ function showPanel(name) {
     b.classList.toggle('on', b.dataset.panel === name));
   $('#panel-calendar').classList.toggle('hidden', name !== 'calendar');
   $('#panel-control').classList.toggle('hidden', name !== 'control');
+  $('#panel-todo').classList.toggle('hidden', name !== 'todo');
 }
 
 // ------------------------------------------------------------------ 배선
@@ -683,10 +686,56 @@ function shiftWeek(days) {
   return d.toISOString().slice(0, 10);
 }
 if (location.hash === '#queue') showPanel('control');       // 1단계 목적지 (하위 호환)
+else if (location.hash === '#todos') { showPanel('todo'); loadTodos(); }   // 메뉴바 「안 한 일 N건」
 else {
   showPanel('calendar');
   if (location.hash === '#review') $('#card-review').scrollIntoView({ block: 'start' });
 }
+
+// ------------------------------------------------------------------ 할 일 (스펙 5단계)
+let TODOS = null;
+function todoRow(a, withSrc) {
+  const cls = 'todo' + (a.done ? ' done' : '') + (a.hidden ? ' hid' : '');
+  const due = a.due ? `<span class="due${a.overdue ? ' over' : ''}">${a.overdue ? '기한 지남 · ' : ''}${esc(a.due)}</span>` : '';
+  const src = withSrc ? `<span class="src"><button class="small go" data-folder="${esc(a.folder)}">${esc(a.folder.slice(0, 10))} ${esc(a.title || '')}</button></span>` : '';
+  return `<div class="${cls}" data-folder="${esc(a.folder)}" data-n="${a.n}">
+    <input type="checkbox" class="done" ${a.done ? 'checked' : ''} title="완료">
+    <span class="t">${esc(a.text)}</span>${due}${src}
+    <button class="small hide" title="${a.hidden ? '다시 표시' : '내 일 아님 (숨김)'}">${a.hidden ? '다시 표시' : '내 일 아님'}</button>
+  </div>`;
+}
+function renderTodos() {
+  if (!TODOS) return;
+  const showHidden = $('#todo-show-hidden').checked;
+  const open = [];
+  TODOS.folders.forEach((g) => g.items.forEach((a) => { if (!a.done && !a.hidden) open.push({ ...a, title: g.title }); }));
+  // 기한 지난 것 먼저, 그 다음 기한 있는 것, 나머지는 최근 회의 순
+  open.sort((x, y) => (y.overdue - x.overdue) || ((y.due_date ? 1 : 0) - (x.due_date ? 1 : 0)) || (x.due_date || '').localeCompare(y.due_date || ''));
+  $('#todo-open-n').textContent = `${open.length}건` + (TODOS.overdue ? ` · 기한 지남 ${TODOS.overdue}` : '');
+  $('#todo-open-list').innerHTML = open.length ? open.map((a) => todoRow(a, true)).join('') : '<div class="meta">안 한 일이 없습니다</div>';
+  $('#todo-by-list').innerHTML = TODOS.folders.map((g) => {
+    const items = g.items.filter((a) => showHidden || !a.hidden);
+    if (!items.length) return '';
+    const left = items.filter((a) => !a.done && !a.hidden).length;
+    return `<details class="todo-mtg"${left ? ' open' : ''}><summary><b>${esc(g.date)}</b> ${esc(g.title)}
+      <span class="meta">${left ? `안 한 일 ${left}` : '전부 완료'} / ${items.length}</span>
+      <button class="small go" data-folder="${esc(g.folder)}">노트 열기</button></summary>${items.map((a) => todoRow(a, false)).join('')}</details>`;
+  }).join('') || '<div class="meta">확정된 노트가 없습니다</div>';
+  document.querySelectorAll('#panel-todo .go').forEach((b) =>
+    b.addEventListener('click', (ev) => { ev.preventDefault(); openDetail(b.dataset.folder); }));
+  document.querySelectorAll('#panel-todo .todo .done').forEach((c) =>
+    c.addEventListener('change', () => todoPost(c.closest('.todo'), { done: c.checked })));
+  document.querySelectorAll('#panel-todo .todo .hide').forEach((b) =>
+    b.addEventListener('click', () => { const r = b.closest('.todo'); todoPost(r, { hidden: !r.classList.contains('hid') }); }));
+}
+async function todoPost(row, body) {
+  const r = await req('/api/todo', { folder: row.dataset.folder, n: +row.dataset.n, ...body });
+  if (!r.ok) alert(r.error || '실패');
+  await loadTodos(); refresh();
+}
+async function loadTodos() { TODOS = await req('/api/todos'); renderTodos(); }
+$('#todo-show-hidden').addEventListener('change', renderTodos);
+document.querySelector('.toptab[data-panel="todo"]').addEventListener('click', loadTodos);
 
 refresh();
 loadWeek('');

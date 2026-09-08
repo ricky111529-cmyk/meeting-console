@@ -9,13 +9,14 @@
 <body>
 <header>
   <h1>회의 콘솔</h1>
-  <div class="meta"><span id="clock">-</span> · <span id="waiting">확인 필요 -</span></div>
+  <div class="meta"><span id="clock">-</span> · <span id="waiting">확인 필요 -</span> · <span id="todo-open">안 한 일 -</span></div>
 </header>
 
 <!-- 첫 화면은 캘린더다 (스펙 8절 결정 4). 제어판은 두 번째 탭으로 내렸다 -->
 <nav id="toptabs">
   <button class="toptab on" data-panel="calendar">캘린더</button>
   <button class="toptab" data-panel="control">제어판</button>
+  <button class="toptab" data-panel="todo">할 일 <span id="todo-badge" class="badge"></span></button>
 </nav>
 
 <main id="panel-calendar">
@@ -36,6 +37,20 @@
     <div id="wk-sum" class="meta">불러오는 중</div>
     <div id="wk-err"></div>
     <div id="wk-grid"></div>
+  </section>
+</main>
+
+<!-- 할 일: 확정 노트의 액션 아이템을 한 화면에 모은다 (스펙 5단계, 2026-09-08). 완료 체크는 노트의 상태 열에 쓴다 -->
+<main id="panel-todo" class="hidden">
+  <section class="card" id="card-todo-open">
+    <h2>안 한 일 <span id="todo-open-n" class="meta"></span></h2>
+    <p class="hint">확정한 회의 노트의 액션 아이템 중 완료하지 않은 것. 체크하면 그 노트의 상태 열이 「완료」로 바뀝니다.
+      노트에는 담당이 없어 전부 올라오니, 내 일이 아니면 「내 일 아님」으로 숨기세요.</p>
+    <div id="todo-open-list">불러오는 중</div>
+  </section>
+  <section class="card" id="card-todo-by">
+    <h2>회의별 <span class="meta"><label class="chk"><input type="checkbox" id="todo-show-hidden"> 숨긴 것도 보기</label></span></h2>
+    <div id="todo-by-list">불러오는 중</div>
   </section>
 </main>
 

@@ -652,3 +652,107 @@ def match_exclude(folder: str) -> str:
 def notify(title: str, message: str) -> None:
     script = f"display notification {json.dumps(message)} with title {json.dumps(title)}"
     subprocess.run(["osascript", "-e", script], capture_output=True)
+
+
+# ---------------------------------------------------------------- 할 일 (확정 노트의 액션 아이템)
+# 노트에는 담당 열이 없다 (템플릿 규칙 7, 2026-08-13). 그래서 "내 것"을 자동으로 가르지 않고
+#  확정 노트의 액션을 전부 올린 뒤, 내 일이 아닌 것은 사람이 숨긴다. 완료 여부는 **노트의 상태 열에
+#  직접 쓴다** (노트 파일이 정본. Confluence 에 올려도 같이 간다). 숨김 표시만 여기 상태 파일에 둔다.
+TODOS_FILE = STATE_DIR / "todos.json"
+ACTION_HEADING = "## 액션 아이템"
+DONE_WORDS = ("완료",)
+
+
+def _action_rows(lines: list[str]) -> list[int]:
+    """notes.md 줄 목록에서 액션 아이템 표의 데이터 행 번호(0-based)를 순서대로 돌려준다."""
+    try:
+        start = next(i for i, l in enumerate(lines) if l.strip() == ACTION_HEADING)
+    except StopIteration:
+        return []
+    rows, seen_header = [], False
+    for i in range(start + 1, len(lines)):
+        l = lines[i].strip()
+        if l.startswith("## "):
+            break
+        if not l.startswith("|"):
+            continue
+        if not seen_header:                      # 첫 표 행은 머리, 그 다음은 구분선
+            seen_header = True
+            continue
+        if set(l.replace("|", "").strip()) <= set("-: "):
+            continue
+        rows.append(i)
+    return rows
+
+
+def _cells(line: str) -> list[str]:
+    parts = line.strip().strip("|").split("|")
+    return [c.strip() for c in parts]
+
+
+def read_actions(folder: str) -> list[dict]:
+    """확정 노트(notes.md)의 액션 아이템. 노트가 없으면 빈 목록."""
+    path = MEETINGS / folder / NOTES_NAME
+    if not path.exists():
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    hidden = read_json(TODOS_FILE, {}).get("hidden", {})
+    out = []
+    for n, i in enumerate(_action_rows(lines), start=1):
+        c = _cells(lines[i])
+        if len(c) < 2:
+            continue
+        text = c[1] if len(c) > 1 else ""
+        due = c[2] if len(c) > 2 else ""
+        status = c[3] if len(c) > 3 else ""
+        if not text or text in ("", "-"):
+            continue
+        key = f"{folder}#{n}"
+        out.append({"folder": folder, "n": n, "key": key, "text": text,
+                    "due": "" if due in ("-", "(미기입)") else due,
+                    "status": status or "대기",
+                    "done": any(w in status for w in DONE_WORDS),
+                    "hidden": bool(hidden.get(key))})
+    return out
+
+
+def set_action_done(folder: str, n: int, done: bool) -> dict:
+    """노트의 액션 아이템 n번 상태 열을 완료/대기로 바꾼다. 다른 셀은 건드리지 않는다."""
+    path = MEETINGS / folder / NOTES_NAME
+    if not path.exists():
+        return {"ok": False, "error": "확정 노트가 없습니다"}
+    with path_lock(path):
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        rows = _action_rows([l.rstrip("\n") for l in lines])
+        if n < 1 or n > len(rows):
+            return {"ok": False, "error": f"액션 {n}번이 없습니다"}
+        i = rows[n - 1]
+        c = _cells(lines[i])
+        while len(c) < 4:
+            c.append("")
+        c[3] = "완료" if done else "대기"
+        nl = "\n" if lines[i].endswith("\n") else ""
+        lines[i] = "| " + " | ".join(c) + " |" + nl
+        path.write_text("".join(lines), encoding="utf-8")
+    return {"ok": True, "message": f"{folder} 액션 {n}: {'완료' if done else '대기'}"}
+
+
+def set_action_hidden(folder: str, n: int, hidden: bool) -> dict:
+    data = read_json(TODOS_FILE, {}) or {}
+    h = data.setdefault("hidden", {})
+    key = f"{folder}#{n}"
+    if hidden:
+        h[key] = True
+    else:
+        h.pop(key, None)
+    write_json(TODOS_FILE, data)
+    return {"ok": True, "message": f"{key}: {'숨김' if hidden else '다시 표시'}"}
+
+
+def all_actions() -> list[dict]:
+    """확정 노트 전부의 액션 아이템. 최근 회의부터."""
+    out = []
+    for folder in sorted(list_folders(), reverse=True):
+        if (MEETINGS / folder / NOTES_NAME).exists():
+            out.extend(read_actions(folder))
+    return out

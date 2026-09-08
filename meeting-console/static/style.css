@@ -132,6 +132,20 @@ button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280;
 /* 놓친 녹음은 눈에 띄게 둔다. 이 상태가 화면에 남지 않으면 실패를 모른 채 지나간다 */
 .st-missing { border-left-color: #000; background: #fff1f1; border-color: #ffc9c9; }
 .miss { color: #b62222; }
+/* 할 일 탭 */
+.todo { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; border-bottom: 1px solid #f1f3f5; font-size: 13px; }
+.todo:last-child { border-bottom: 0; }
+.todo input[type=checkbox] { margin-top: 3px; }
+.todo .t { flex: 1; }
+.todo.done .t { color: #9ca3af; text-decoration: line-through; }
+.todo.hid .t { color: #9ca3af; font-style: italic; }
+.todo .due { font-size: 12px; color: #6b7280; white-space: nowrap; }
+.todo .due.over { color: #b62222; font-weight: 600; }
+.todo .src { font-size: 12px; color: #6b7280; }
+.todo .src button { font-size: 11px; padding: 0 6px; }
+.todo-mtg { margin: 6px 0; }
+.todo-mtg summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
+.todo-mtg summary .meta { margin-left: 6px; }
 #d-cal table { max-width: 720px; }
 #d-cal th { width: 110px; }
 

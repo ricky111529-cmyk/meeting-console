@@ -119,6 +119,7 @@ def snapshot(force_schedule: bool = False) -> dict:
         "next": console.next_event(targets),
         "schedule_error": sched.get("error"),
         "waiting": waiting_count(),
+        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["hidden"]),
         "autorecord": console.autorecord_on(),
     }
 
@@ -264,6 +265,7 @@ def main() -> int:
             self.item_stop = rumps.MenuItem("지금 녹음 중지", callback=None)
             self.item_auto = rumps.MenuItem("자동 녹음", callback=self.on_auto)
             self.item_queue = rumps.MenuItem("확인 필요 없음", callback=None)
+            self.item_todo = rumps.MenuItem("안 한 일 없음", callback=None)
             self.menu = [
                 self.item_status,
                 None,
@@ -271,6 +273,7 @@ def main() -> int:
                 self.item_stop,
                 self.item_auto,
                 self.item_queue,
+                self.item_todo,
                 None,
                 rumps.MenuItem("새로고침", callback=lambda _: self.refresh(force=True)),
                 rumps.MenuItem("종료", callback=lambda _: rumps.quit_application()),
@@ -336,11 +339,19 @@ def main() -> int:
             n = snap["waiting"]
             self.item_queue.title = f"확인 필요 {n}건" if n else "확인 필요 없음"
             self.item_queue.set_callback(self.on_queue if n else None)
+            t = snap.get("todo_open", 0)
+            self.item_todo.title = f"안 한 일 {t}건" if t else "안 한 일 없음"
+            self.item_todo.set_callback(self.on_todo if t else None)
 
         # ---- 메뉴 동작
 
         def on_open(self, _):
             ok, msg = open_console()
+            if not ok:
+                rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", msg)
+
+        def on_todo(self, _):
+            ok, msg = open_console("#todos")
             if not ok:
                 rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", msg)
 

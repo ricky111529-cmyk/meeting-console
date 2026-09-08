@@ -781,10 +781,33 @@ def full_state() -> dict:
         #  「처리 상태」 표로 내려갔으므로 이 값과 「확인 필요」 절의 행 수, 메뉴바의
         #  「확인 필요 N건」이 항상 같아야 한다.
         "waiting": len(groups["확인 필요"]),
+        # 할 일 탭 배지. 확정 노트의 액션 중 완료도 숨김도 아닌 것 (스펙 5단계)
+        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["hidden"]),
         "diagnostics": diagnostics(),
         "enroll": {k: {"state": v.get("state", ""), "message": v.get("message", "")}
                    for k, v in _enroll.items()},
     }
+
+
+# ---------------------------------------------------------------- 할 일 탭 (스펙 5단계)
+
+def todos_payload() -> dict:
+    """확정 노트의 액션 아이템을 회의별로 묶고, 안 한 일·기한 지난 일을 센다."""
+    today = datetime.now(ms.TZ).strftime("%Y-%m-%d")
+    items = ms.all_actions()
+    by: dict[str, dict] = {}
+    for a in items:
+        m = re.search(r"\d{4}-\d{2}-\d{2}", a["due"] or "")
+        a["due_date"] = m.group(0) if m else ""
+        a["overdue"] = bool(a["due_date"]) and a["due_date"] < today and not a["done"]
+        g = by.setdefault(a["folder"], {
+            "folder": a["folder"], "date": a["folder"][:10],
+            "title": ms.meeting_title(a["folder"], ms.MEETINGS / a["folder"]), "items": []})
+        g["items"].append(a)
+    open_items = [a for a in items if not a["done"] and not a["hidden"]]
+    return {"today": today, "folders": list(by.values()),
+            "open": len(open_items), "overdue": sum(1 for a in open_items if a["overdue"]),
+            "done": sum(1 for a in items if a["done"]), "hidden": sum(1 for a in items if a["hidden"])}
 
 
 # ---------------------------------------------------------------- 검수 화면
@@ -1767,6 +1790,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/today":
             self._json(200, today_schedule(force=q.get("force") == "1"))
             return
+        if path == "/api/todos":
+            self._json(200, todos_payload())
+            return
         if path == "/api/week":
             # 캐시에 있는 것만 담아 바로 돌려준다. 없는 날은 화면이 /api/schedule 로 하나씩 받는다
             start = q.get("start") or datetime.now(ms.TZ).strftime("%Y-%m-%d")
@@ -1875,6 +1901,20 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/regenerate":
             self._json(200, regenerate(folder))
+            return
+        if path == "/api/todo":
+            # 완료 여부는 노트의 상태 열에 쓴다. 숨김은 콘솔 상태 파일에만 둔다 (스펙 5단계)
+            try:
+                n = int(data.get("n", 0))
+            except (TypeError, ValueError):
+                self._json(400, {"ok": False, "error": "n 이 정수가 아닙니다"}); return
+            if "done" in data:
+                res = ms.set_action_done(folder, n, bool(data["done"]))
+            elif "hidden" in data:
+                res = ms.set_action_hidden(folder, n, bool(data["hidden"]))
+            else:
+                res = {"ok": False, "error": "done 또는 hidden 이 필요합니다"}
+            self._json(200, res)
             return
         if path == "/api/enroll":
             # 등록부 저장은 기본 켬 (스펙 8절 결정 2). 화면에서 끄면 이 회의에만 이름이 붙는다
