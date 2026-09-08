@@ -29,6 +29,7 @@ import math
 import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +49,7 @@ SERVER_PY = CONSOLE / "server.py"
 SERVER_LOG = ms.LOGS / "menubar-server.log"
 RECORDER_LABEL = "com.meeting-console.meeting-recorder"
 
+STOP_CONFIRM_SEC = 6                 # 「지금 녹음 중지」 두 번 클릭 확인 유효 시간
 TICK_SEC = 10                       # 녹음 중 갱신 주기 (스펙 3-2)
 SLOW_SEC = 60                       # 녹음 중이 아닐 때 갱신 주기
 SCHEDULE_TTL = 300                  # 일정 캐시 5분 (스펙 3-2)
@@ -365,15 +367,34 @@ def main() -> int:
                 rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", msg)
 
         def on_stop(self, _):
-            rec = self._snap.get("recording") or {}
-            name = rec.get("title") or rec.get("folder") or "지금 녹음"
-            if not rumps.alert(title="녹음을 중지할까요?",
-                               message=f"{name}\n중지하면 이 시점까지만 녹음됩니다.",
-                               ok="중지", cancel="취소"):
+            """두 번 클릭으로 확인한다. **모달 대화상자를 쓰지 않는다.**
+
+            2026-09-08 실사고: rumps.alert(NSAlert runModal) 가 다른 화면·창 뒤에 떠서 사용자가 못 봤고,
+            메뉴바는 답을 기다리며 23분간 굳었다(심박 15:32 정지, 제목 「남은 28분」 고정). 녹음은 계속됐다.
+            메뉴 항목 자체가 확인 단계가 되면 어디에도 숨을 창이 없다.
+            """
+            now = time.time()
+            if now - getattr(self, "_stop_armed", 0) > STOP_CONFIRM_SEC:
+                self._stop_armed = now
+                self.item_stop.title = f"⚠ 정말 중지할까요? {STOP_CONFIRM_SEC}초 안에 다시 클릭"
+                rumps.Timer(self._disarm_stop, STOP_CONFIRM_SEC + 0.5).start()
                 return
-            res = stop_recording_now()
-            rumps.notification("회의 콘솔", "", res.get("message") or res.get("error") or "")
-            self.refresh(force=True)
+            self._stop_armed = 0
+            self.item_stop.title = "중지하는 중…"
+            self.item_stop.set_callback(None)
+
+            def work():
+                # kill -INT 뒤 최대 20초를 기다린다. 메인 스레드에서 기다리면 그동안 메뉴바가 굳는다
+                res = stop_recording_now()
+                rumps.notification("회의 콘솔", "", res.get("message") or res.get("error") or "")
+                self.refresh(force=True)
+            threading.Thread(target=work, daemon=True).start()
+
+        def _disarm_stop(self, timer):
+            timer.stop()
+            if getattr(self, "_stop_armed", 0):
+                self._stop_armed = 0
+                self.refresh()                       # 제목을 원래대로
 
         def on_auto(self, _):
             res = set_autorecord(not self._snap["autorecord"])
