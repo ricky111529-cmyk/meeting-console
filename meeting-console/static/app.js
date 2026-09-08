@@ -725,19 +725,31 @@ function renderTodos() {
   const showAll = $('#todo-show-all').checked;
   const all = [];
   TODOS.folders.forEach((g) => g.items.forEach((a) => all.push({ ...a, title: g.title })));
-  const open = all.filter((a) => !a.done && !a.dropped && !a.hidden);
+  const open = all.filter((a) => !a.done && !a.dropped && !a.hidden && !a.archived);
+  $('#todo-archive-before').value = (TODOS.settings || {}).archive_before || '';
   $('#todo-open-n').textContent = `안 한 일 ${open.length}건` + (TODOS.overdue ? ` · 기한 지남 ${TODOS.overdue}` : '') +
     (showAll ? ` · 완료 ${TODOS.done} · 안 하기로 함 ${TODOS.dropped} · 할 일 아님 ${TODOS.hidden}` : '');
   let html = '';
   const over = open.filter((a) => a.overdue).sort((x, y) => (x.due_date || '').localeCompare(y.due_date || ''));
   if (over.length) html += todoGroup(`<b>기한 지남</b><span class="cnt">${over.length}건</span>`, 'over', over, true, '');
-  TODOS.folders.forEach((g) => {
+  const archived = TODOS.folders.filter((g) => g.items.some((a) => a.archived));
+  TODOS.folders.filter((g) => !g.items.some((a) => a.archived)).forEach((g) => {
     const items = g.items.filter((a) => showAll || (!a.done && !a.dropped && !a.hidden)).filter((a) => showAll || !a.overdue);
     if (!items.length) return;
     const left = g.items.filter((a) => !a.done && !a.dropped && !a.hidden).length;
     html += todoGroup(`<b>${esc(g.date)}</b> ${esc(g.title)}<span class="cnt">${left ? `안 한 일 ${left}` : '전부 완료'} / ${g.items.length}</span>`,
       '', items, false, g.folder);
   });
+  if (archived.length) {
+    // 기준 날짜 이전 회의는 접어서 아래에 둔다. 집계에서 빠지지만 지우지는 않는다 (2026-09-08 사용자 요청)
+    const ab = (TODOS.settings || {}).archive_before || '';
+    html += `<details class="todo-archive"><summary><b>보관</b> <span class="cnt">${esc(ab)} 이전 회의 ${archived.length}개 · 안 한 일 ${TODOS.archived_open || 0}건 (집계에서 제외)</span></summary>` +
+      archived.map((g) => {
+        const items = g.items.filter((a) => showAll || (!a.done && !a.dropped && !a.hidden));
+        if (!items.length) return '';
+        return todoGroup(`<b>${esc(g.date)}</b> ${esc(g.title)}<span class="cnt">${items.length}건</span>`, '', items, false, g.folder);
+      }).join('') + '</details>';
+  }
   $('#todo-list').innerHTML = html || '<div class="meta">안 한 일이 없습니다</div>';
   document.querySelectorAll('#panel-todo .go').forEach((b) =>
     b.addEventListener('click', () => openDetail(b.dataset.folder)));
@@ -757,6 +769,11 @@ async function todoPost(row, body) {
 }
 async function loadTodos() { TODOS = await req('/api/todos'); renderTodos(); }
 $('#todo-show-all').addEventListener('change', renderTodos);
+$('#todo-archive-before').addEventListener('change', async (ev) => {
+  const r = await req('/api/todo-settings', { archive_before: ev.target.value });
+  if (!r.ok) alert(r.error || '실패');
+  await loadTodos(); refresh();
+});
 document.querySelector('.toptab[data-panel="todo"]').addEventListener('click', loadTodos);
 
 refresh();

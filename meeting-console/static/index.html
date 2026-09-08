@@ -45,7 +45,10 @@
   <section class="card" id="card-todo">
     <div class="todo-head">
       <h2>할 일 <span id="todo-open-n" class="meta"></span></h2>
-      <label class="chk meta"><input type="checkbox" id="todo-show-all"> 완료·숨긴 것도 보기</label>
+      <span class="meta todo-tools">
+        <label class="chk"><input type="checkbox" id="todo-show-all"> 완료·숨긴 것도 보기</label>
+        <label class="chk">이 날짜 이전 회의는 보관 <input type="date" id="todo-archive-before"></label>
+      </span>
     </div>
     <p class="hint">확정한 회의 노트의 액션 아이템입니다. 체크하면 그 노트의 상태 열이 「완료」로 바뀝니다.
       노트에 담당이 없어 전부 올라옵니다. 잘못 뽑혔거나 남의 일이면 「할 일 아님」, 하기로 했다가 안 하기로 바뀌었으면 「안 하기로 함」(노트에 「안 함」으로 남습니다).</p>

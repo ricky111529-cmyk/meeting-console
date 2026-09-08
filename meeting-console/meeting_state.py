@@ -715,7 +715,7 @@ def read_actions(folder: str) -> list[dict]:
         if not text or text in ("", "-"):
             continue
         key = f"{folder}#{n}"
-        out.append({"folder": folder, "n": n, "key": key, "text": text,
+        out.append({"folder": folder, "n": n, "key": key, "text": text, "archived": is_archived(folder),
                     "due": "" if due in ("-", "(미기입)") else due,
                     "status": status or "대기",
                     "done": any(w in status for w in DONE_WORDS),
@@ -765,6 +765,28 @@ def set_action_hidden(folder: str, n: int, hidden: bool) -> dict:
         h.pop(key, None)
     write_json(TODOS_FILE, data)
     return {"ok": True, "message": f"{key}: {'숨김' if hidden else '다시 표시'}"}
+
+
+def todo_settings() -> dict:
+    """할 일 탭 설정. archive_before: 이 날짜(YYYY-MM-DD) 이전 회의의 액션은 「보관」으로 접고 집계에서 뺀다."""
+    d = read_json(TODOS_FILE, {}) or {}
+    return {"archive_before": d.get("archive_before", "")}
+
+
+def set_todo_settings(patch: dict) -> dict:
+    d = read_json(TODOS_FILE, {}) or {}
+    if "archive_before" in patch:
+        v = str(patch["archive_before"] or "").strip()
+        if v and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+            return {"ok": False, "error": "날짜는 YYYY-MM-DD 형식"}
+        d["archive_before"] = v
+    write_json(TODOS_FILE, d)
+    return {"ok": True, "message": "보관 기준: " + (d.get("archive_before") or "없음")}
+
+
+def is_archived(folder: str) -> bool:
+    ab = todo_settings()["archive_before"]
+    return bool(ab) and folder[:10] < ab
 
 
 def all_actions() -> list[dict]:

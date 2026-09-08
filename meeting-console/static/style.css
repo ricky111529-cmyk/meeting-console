@@ -135,6 +135,11 @@ button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280;
 /* 할 일 탭. 한 줄 = 체크박스 + 할 일 문장. 회의 단위로 묶고, 부가 정보는 작고 흐리게 (2026-09-08 가독성 재작업) */
 .todo-head { display: flex; justify-content: space-between; align-items: center; }
 .todo-head h2 { margin: 0; }
+.todo-tools { display: flex; gap: 16px; align-items: center; }
+.todo-tools input[type=date] { font-size: 12px; padding: 2px 6px; }
+.todo-archive { margin-top: 18px; border-top: 2px dashed #e5e7eb; padding-top: 8px; }
+.todo-archive > summary { cursor: pointer; font-size: 13px; color: #6b7280; padding: 4px 0; }
+.todo-archive > summary b { color: #16181d; }
 .todo-grp { margin: 14px 0 4px; }
 .todo-grp-h { display: flex; align-items: baseline; gap: 8px; padding: 6px 0 4px; border-bottom: 2px solid #e5e7eb; }
 .todo-grp-h b { font-size: 14px; }

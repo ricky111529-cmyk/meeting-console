@@ -782,7 +782,7 @@ def full_state() -> dict:
         #  「확인 필요 N건」이 항상 같아야 한다.
         "waiting": len(groups["확인 필요"]),
         # 할 일 탭 배지. 확정 노트의 액션 중 완료도 숨김도 아닌 것 (스펙 5단계)
-        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["dropped"] and not a["hidden"]),
+        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["dropped"] and not a["hidden"] and not a["archived"]),
         "diagnostics": diagnostics(),
         "enroll": {k: {"state": v.get("state", ""), "message": v.get("message", "")}
                    for k, v in _enroll.items()},
@@ -804,8 +804,9 @@ def todos_payload() -> dict:
             "folder": a["folder"], "date": a["folder"][:10],
             "title": ms.meeting_title(a["folder"], ms.MEETINGS / a["folder"]), "items": []})
         g["items"].append(a)
-    open_items = [a for a in items if not a["done"] and not a["dropped"] and not a["hidden"]]
-    return {"today": today, "folders": list(by.values()),
+    open_items = [a for a in items if not a["done"] and not a["dropped"] and not a["hidden"] and not a["archived"]]
+    return {"today": today, "folders": list(by.values()), "settings": ms.todo_settings(),
+            "archived_open": sum(1 for a in items if a["archived"] and not a["done"] and not a["dropped"] and not a["hidden"]),
             "open": len(open_items), "overdue": sum(1 for a in open_items if a["overdue"]),
             "done": sum(1 for a in items if a["done"]), "dropped": sum(1 for a in items if a["dropped"]),
             "hidden": sum(1 for a in items if a["hidden"])}
@@ -1902,6 +1903,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/regenerate":
             self._json(200, regenerate(folder))
+            return
+        if path == "/api/todo-settings":
+            self._json(200, ms.set_todo_settings(data if isinstance(data, dict) else {}))
             return
         if path == "/api/todo":
             # 완료 여부는 노트의 상태 열에 쓴다. 숨김은 콘솔 상태 파일에만 둔다 (스펙 5단계)
