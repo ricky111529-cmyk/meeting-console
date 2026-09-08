@@ -457,7 +457,13 @@ def current_recording() -> dict | None:
 # ---------------------------------------------------------------- 폴더 상태
 
 def audio_files(d: Path) -> list[Path]:
-    return sorted(p for p in d.glob("audio*") if p.suffix.lower() in AUDIO_EXTS)
+    """폴더의 오디오. **`audio.<ext>` 정확 일치를 맨 앞에** 둔다.
+
+    2026-09-08 실사고: 백업을 `audio-full.m4a` 로 두자 이름순 정렬에서 그것이 먼저 잡혀, 콘솔의 화자 등록이
+    잘리기 전 원본으로 분리를 돌렸고 잘못된 덩어리가 등록부에 들어갔다. 이름에 접미사가 붙은 파일은 뒤로 보낸다.
+    """
+    files = [p for p in d.glob("audio*") if p.suffix.lower() in AUDIO_EXTS]
+    return sorted(files, key=lambda p: (p.stem != "audio", p.name))
 
 
 _DUR_CACHE = STATE_DIR / "durations.json"
