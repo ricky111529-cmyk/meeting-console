@@ -782,7 +782,7 @@ def full_state() -> dict:
         #  「확인 필요 N건」이 항상 같아야 한다.
         "waiting": len(groups["확인 필요"]),
         # 할 일 탭 배지. 확정 노트의 액션 중 완료도 숨김도 아닌 것 (스펙 5단계)
-        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["hidden"]),
+        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["dropped"] and not a["hidden"]),
         "diagnostics": diagnostics(),
         "enroll": {k: {"state": v.get("state", ""), "message": v.get("message", "")}
                    for k, v in _enroll.items()},
@@ -799,15 +799,16 @@ def todos_payload() -> dict:
     for a in items:
         m = re.search(r"\d{4}-\d{2}-\d{2}", a["due"] or "")
         a["due_date"] = m.group(0) if m else ""
-        a["overdue"] = bool(a["due_date"]) and a["due_date"] < today and not a["done"]
+        a["overdue"] = bool(a["due_date"]) and a["due_date"] < today and not a["done"] and not a["dropped"]
         g = by.setdefault(a["folder"], {
             "folder": a["folder"], "date": a["folder"][:10],
             "title": ms.meeting_title(a["folder"], ms.MEETINGS / a["folder"]), "items": []})
         g["items"].append(a)
-    open_items = [a for a in items if not a["done"] and not a["hidden"]]
+    open_items = [a for a in items if not a["done"] and not a["dropped"] and not a["hidden"]]
     return {"today": today, "folders": list(by.values()),
             "open": len(open_items), "overdue": sum(1 for a in open_items if a["overdue"]),
-            "done": sum(1 for a in items if a["done"]), "hidden": sum(1 for a in items if a["hidden"])}
+            "done": sum(1 for a in items if a["done"]), "dropped": sum(1 for a in items if a["dropped"]),
+            "hidden": sum(1 for a in items if a["hidden"])}
 
 
 # ---------------------------------------------------------------- 검수 화면
@@ -1908,7 +1909,9 @@ class Handler(BaseHTTPRequestHandler):
                 n = int(data.get("n", 0))
             except (TypeError, ValueError):
                 self._json(400, {"ok": False, "error": "n 이 정수가 아닙니다"}); return
-            if "done" in data:
+            if "status" in data:
+                res = ms.set_action_status(folder, n, str(data["status"]))
+            elif "done" in data:
                 res = ms.set_action_done(folder, n, bool(data["done"]))
             elif "hidden" in data:
                 res = ms.set_action_hidden(folder, n, bool(data["hidden"]))

@@ -695,14 +695,24 @@ else {
 // ------------------------------------------------------------------ 할 일 (스펙 5단계)
 // 한 줄 = 체크박스 + 문장. 회의 단위로 묶어 훑기 쉽게. 기한 지난 것은 맨 위에 따로 모은다 (2026-09-08 가독성 재작업)
 let TODOS = null;
+// 목록에서 빼는 길은 둘이고 뜻이 다르다 (2026-09-08 사용자 결정):
+//  「할 일 아님」= 노트가 잘못 뽑았거나 남의 일 → 내 화면에서만 숨김 (콘솔 상태 파일)
+//  「안 하기로 함」= 하기로 했다가 결정이 바뀜 → 노트 상태 열에 「안 함」 (다른 사람도 봐야 하는 결정)
 function todoRow(a, withSrc) {
-  const cls = 'todo' + (a.done ? ' done' : '') + (a.hidden ? ' hid' : '');
-  const due = a.due ? `<span class="due${a.overdue ? ' over' : ''}">${a.overdue ? '기한 지남 · ' : ''}${esc(a.due)}</span>` : '<span></span>';
+  const cls = 'todo' + (a.done ? ' done' : '') + (a.dropped ? ' drop' : '') + (a.hidden ? ' hid' : '');
+  let due = a.due ? `<span class="due${a.overdue ? ' over' : ''}">${a.overdue ? '기한 지남 · ' : ''}${esc(a.due)}</span>` : '<span></span>';
+  if (a.dropped) due = '<span class="due drop">안 하기로 함</span>';
+  else if (a.hidden) due = '<span class="due">할 일 아님</span>';
   const src = withSrc ? `<span class="src">${esc(a.folder.slice(0, 10))} · ${esc(a.title || a.folder)}</span>` : '';
+  let acts;
+  if (a.hidden) acts = '<button class="act" data-act="unhide">다시 표시</button>';
+  else if (a.dropped) acts = '<button class="act" data-act="reopen">되돌리기</button>';
+  else acts = '<button class="act" data-act="hide" title="노트가 잘못 뽑았거나 남의 일">할 일 아님</button>' +
+              '<button class="act" data-act="drop" title="하기로 했다가 안 하기로 바뀜 (노트에 「안 함」으로 남습니다)">안 하기로 함</button>';
   return `<div class="${cls}" data-folder="${esc(a.folder)}" data-n="${a.n}">
-    <input type="checkbox" class="done" ${a.done ? 'checked' : ''} title="완료로 표시">
+    <input type="checkbox" class="done" ${a.done ? 'checked' : ''} ${a.dropped || a.hidden ? 'disabled' : ''} title="완료로 표시">
     <span class="t">${esc(a.text)}${src}</span>${due}
-    <button class="hide" title="${a.hidden ? '다시 표시' : '내 일이 아니면 숨기기'}">${a.hidden ? '다시 표시' : '숨기기'}</button>
+    <span class="acts">${acts}</span>
   </div>`;
 }
 function todoGroup(head, cls, items, withSrc, folder) {
@@ -715,16 +725,16 @@ function renderTodos() {
   const showAll = $('#todo-show-all').checked;
   const all = [];
   TODOS.folders.forEach((g) => g.items.forEach((a) => all.push({ ...a, title: g.title })));
-  const open = all.filter((a) => !a.done && !a.hidden);
+  const open = all.filter((a) => !a.done && !a.dropped && !a.hidden);
   $('#todo-open-n').textContent = `안 한 일 ${open.length}건` + (TODOS.overdue ? ` · 기한 지남 ${TODOS.overdue}` : '') +
-    (showAll ? ` · 완료 ${TODOS.done} · 숨김 ${TODOS.hidden}` : '');
+    (showAll ? ` · 완료 ${TODOS.done} · 안 하기로 함 ${TODOS.dropped} · 할 일 아님 ${TODOS.hidden}` : '');
   let html = '';
   const over = open.filter((a) => a.overdue).sort((x, y) => (x.due_date || '').localeCompare(y.due_date || ''));
   if (over.length) html += todoGroup(`<b>기한 지남</b><span class="cnt">${over.length}건</span>`, 'over', over, true, '');
   TODOS.folders.forEach((g) => {
-    const items = g.items.filter((a) => showAll || (!a.done && !a.hidden)).filter((a) => showAll || !a.overdue);
+    const items = g.items.filter((a) => showAll || (!a.done && !a.dropped && !a.hidden)).filter((a) => showAll || !a.overdue);
     if (!items.length) return;
-    const left = g.items.filter((a) => !a.done && !a.hidden).length;
+    const left = g.items.filter((a) => !a.done && !a.dropped && !a.hidden).length;
     html += todoGroup(`<b>${esc(g.date)}</b> ${esc(g.title)}<span class="cnt">${left ? `안 한 일 ${left}` : '전부 완료'} / ${g.items.length}</span>`,
       '', items, false, g.folder);
   });
@@ -733,8 +743,12 @@ function renderTodos() {
     b.addEventListener('click', () => openDetail(b.dataset.folder)));
   document.querySelectorAll('#panel-todo .todo .done').forEach((c) =>
     c.addEventListener('change', () => todoPost(c.closest('.todo'), { done: c.checked })));
-  document.querySelectorAll('#panel-todo .todo .hide').forEach((b) =>
-    b.addEventListener('click', () => { const r = b.closest('.todo'); todoPost(r, { hidden: !r.classList.contains('hid') }); }));
+  document.querySelectorAll('#panel-todo .todo .act').forEach((b) =>
+    b.addEventListener('click', () => {
+      const r = b.closest('.todo');
+      const body = { hide: { hidden: true }, unhide: { hidden: false }, drop: { status: '안 함' }, reopen: { status: '대기' } }[b.dataset.act];
+      todoPost(r, body);
+    }));
 }
 async function todoPost(row, body) {
   const r = await req('/api/todo', { folder: row.dataset.folder, n: +row.dataset.n, ...body });

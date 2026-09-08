@@ -153,8 +153,11 @@ button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280;
 .todo.hid .t { color: #9ca3af; }
 .todo .due { font-size: 12px; color: #6b7280; white-space: nowrap; padding: 2px 8px; border-radius: 10px; background: #f1f2f3; margin-top: 2px; }
 .todo .due.over { color: #b62222; background: #fdecec; font-weight: 500; }
-.todo .hide { font-size: 12px; color: #9ca3af; background: none; border: 0; padding: 2px 4px; cursor: pointer; margin-top: 2px; }
-.todo .hide:hover { color: #16181d; text-decoration: underline; }
+.todo .acts { display: flex; gap: 2px; white-space: nowrap; }
+.todo .act { font-size: 12px; color: #9ca3af; background: none; border: 0; padding: 2px 5px; cursor: pointer; margin-top: 2px; }
+.todo .act:hover { color: #16181d; text-decoration: underline; }
+.todo.drop .t { color: #6b7280; }
+.todo .due.drop { color: #6b7280; background: #eceef1; }
 #d-cal table { max-width: 720px; }
 #d-cal th { width: 110px; }
 

@@ -121,7 +121,7 @@ def snapshot(force_schedule: bool = False) -> dict:
         "next": console.next_event(targets),
         "schedule_error": sched.get("error"),
         "waiting": waiting_count(),
-        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["hidden"]),
+        "todo_open": sum(1 for a in ms.all_actions() if not a["done"] and not a["dropped"] and not a["hidden"]),
         "autorecord": console.autorecord_on(),
     }
 

@@ -667,6 +667,7 @@ def notify(title: str, message: str) -> None:
 TODOS_FILE = STATE_DIR / "todos.json"
 ACTION_HEADING = "## 액션 아이템"
 DONE_WORDS = ("완료",)
+DROP_WORDS = ("안 함", "안함", "취소")     # 하기로 했다가 안 하기로 바뀐 것. 결정이라 노트 상태 열에 남긴다
 
 
 def _action_rows(lines: list[str]) -> list[int]:
@@ -718,12 +719,23 @@ def read_actions(folder: str) -> list[dict]:
                     "due": "" if due in ("-", "(미기입)") else due,
                     "status": status or "대기",
                     "done": any(w in status for w in DONE_WORDS),
+                    "dropped": any(w in status for w in DROP_WORDS),
                     "hidden": bool(hidden.get(key))})
     return out
 
 
 def set_action_done(folder: str, n: int, done: bool) -> dict:
-    """노트의 액션 아이템 n번 상태 열을 완료/대기로 바꾼다. 다른 셀은 건드리지 않는다."""
+    return set_action_status(folder, n, "완료" if done else "대기")
+
+
+def set_action_status(folder: str, n: int, status: str) -> dict:
+    """노트의 액션 아이템 n번 상태 열을 바꾼다 (완료 · 대기 · 안 함). 다른 셀은 건드리지 않는다.
+
+    「안 함」은 "하기로 했다가 안 하기로 바뀜" 이라는 결정이므로 노트에 남긴다. 잘못 뽑힌 항목(할 일 아님)은
+    노트를 고치지 않고 숨김 표시만 한다 (set_action_hidden). 두 뜻을 섞지 않는다 (2026-09-08 사용자 결정).
+    """
+    if status not in ("완료", "대기", "안 함"):
+        return {"ok": False, "error": f"허용되지 않는 상태: {status}"}
     path = MEETINGS / folder / NOTES_NAME
     if not path.exists():
         return {"ok": False, "error": "확정 노트가 없습니다"}
@@ -736,11 +748,11 @@ def set_action_done(folder: str, n: int, done: bool) -> dict:
         c = _cells(lines[i])
         while len(c) < 4:
             c.append("")
-        c[3] = "완료" if done else "대기"
+        c[3] = status
         nl = "\n" if lines[i].endswith("\n") else ""
         lines[i] = "| " + " | ".join(c) + " |" + nl
         path.write_text("".join(lines), encoding="utf-8")
-    return {"ok": True, "message": f"{folder} 액션 {n}: {'완료' if done else '대기'}"}
+    return {"ok": True, "message": f"{folder} 액션 {n}: {status}"}
 
 
 def set_action_hidden(folder: str, n: int, hidden: bool) -> dict:
