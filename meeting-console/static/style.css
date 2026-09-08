@@ -38,6 +38,12 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 12px;
 #detail-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
 .pane { display: flex; flex-direction: column; min-height: 0; }
 .paneL { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+/* 두 칸의 머리띠. 왼쪽(노트)은 파랑, 오른쪽(원문 자료)은 회색으로 역할을 색으로도 가른다 */
+.paneH { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; margin-bottom: 6px; border-radius: 6px; font-size: 12px; border-left: 4px solid; }
+.paneH b { font-size: 13px; }
+.paneH span { color: #6b7280; }
+.paneH.note { background: #eef4ff; border-color: #1b64da; }
+.paneH.src { background: #f3f4f6; border-color: #9ca3af; }
 textarea { flex: 1; width: 100%; font: 12px/1.6 ui-monospace, Menlo, monospace;
            padding: 10px; border: 1px solid #d7dbe0; border-radius: 6px; resize: none; }
 .tabs { display: flex; gap: 4px; margin-bottom: 6px; }

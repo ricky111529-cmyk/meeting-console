@@ -95,14 +95,16 @@
     <div id="d-cal" class="hidden"></div>
     <div id="detail-body">
       <div class="pane">
-        <label class="paneL">초안 (직접 고칠 수 있습니다)</label>
+        <!-- 왼쪽 = 정리된 노트, 오른쪽 = 녹음에서 나온 원문 자료. 어느 쪽이 무엇인지 첫눈에 갈리게 머리띠를 붙인다 (2026-09-08 사용자 피드백) -->
+        <div class="paneH note"><b>회의 노트</b><span id="note-sub">오른쪽 원문을 정리한 초안. 직접 고쳐서 확정합니다</span></div>
         <!-- [?] 표기와 (미기입) 칸을 세어 눈에 띄게 띄운다 (스펙 5-2). 누르면 그 자리로 간다 -->
         <div id="d-marks" class="marks"></div>
         <textarea id="d-draft" spellcheck="false"></textarea>
       </div>
       <div class="pane">
+        <div class="paneH src"><b>녹음 원문 (자료)</b><span>녹음에서 자동으로 나온 것. 노트의 근거이며 읽기만 합니다</span></div>
         <div class="tabs">
-          <button class="tab on" data-tab="speakers">화자 분리본</button>
+          <button class="tab on" data-tab="speakers">화자별 원문</button>
           <button class="tab" data-tab="attendees">참석자</button>
           <button class="tab" data-tab="search">원문 검색</button>
           <button class="tab" data-tab="log">실행 로그</button>

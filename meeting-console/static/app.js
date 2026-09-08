@@ -178,6 +178,9 @@ async function openDetail(folder) {
   if (CUR.speaker_hint) warn += `<div class="warn">${esc(CUR.speaker_hint)}</div>`;
   $('#d-warn').innerHTML = warn;
   $('#d-draft').value = CUR.state === 'approved' ? CUR.notes_text : CUR.draft_text;
+  $('#note-sub').textContent = CUR.state === 'approved'
+    ? '오른쪽 원문을 정리해 확정한 노트 (docs/meetings/' + CUR.folder + '/notes.md)'
+    : '오른쪽 원문을 정리한 초안. 직접 고쳐서 확정합니다';
   $('#t-speakers').innerHTML = `<pre>${esc(CUR.speakers || '(화자 분리본 없음)')}</pre>`;
   $('#spk-line').innerHTML = '';
   closeDrawer();
