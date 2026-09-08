@@ -42,15 +42,14 @@
 
 <!-- 할 일: 확정 노트의 액션 아이템을 한 화면에 모은다 (스펙 5단계, 2026-09-08). 완료 체크는 노트의 상태 열에 쓴다 -->
 <main id="panel-todo" class="hidden">
-  <section class="card" id="card-todo-open">
-    <h2>안 한 일 <span id="todo-open-n" class="meta"></span></h2>
-    <p class="hint">확정한 회의 노트의 액션 아이템 중 완료하지 않은 것. 체크하면 그 노트의 상태 열이 「완료」로 바뀝니다.
-      노트에는 담당이 없어 전부 올라오니, 내 일이 아니면 「내 일 아님」으로 숨기세요.</p>
-    <div id="todo-open-list">불러오는 중</div>
-  </section>
-  <section class="card" id="card-todo-by">
-    <h2>회의별 <span class="meta"><label class="chk"><input type="checkbox" id="todo-show-hidden"> 숨긴 것도 보기</label></span></h2>
-    <div id="todo-by-list">불러오는 중</div>
+  <section class="card" id="card-todo">
+    <div class="todo-head">
+      <h2>할 일 <span id="todo-open-n" class="meta"></span></h2>
+      <label class="chk meta"><input type="checkbox" id="todo-show-all"> 완료·숨긴 것도 보기</label>
+    </div>
+    <p class="hint">확정한 회의 노트의 액션 아이템입니다. 체크하면 그 노트의 상태 열이 「완료」로 바뀝니다.
+      노트에 담당이 없어 전부 올라오니, 내 일이 아니면 오른잽 「숨기기」를 누르세요.</p>
+    <div id="todo-list">불러오는 중</div>
   </section>
 </main>
 

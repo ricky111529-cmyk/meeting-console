@@ -132,20 +132,29 @@ button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280;
 /* 놓친 녹음은 눈에 띄게 둔다. 이 상태가 화면에 남지 않으면 실패를 모른 채 지나간다 */
 .st-missing { border-left-color: #000; background: #fff1f1; border-color: #ffc9c9; }
 .miss { color: #b62222; }
-/* 할 일 탭 */
-.todo { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; border-bottom: 1px solid #f1f3f5; font-size: 13px; }
+/* 할 일 탭. 한 줄 = 체크박스 + 할 일 문장. 회의 단위로 묶고, 부가 정보는 작고 흐리게 (2026-09-08 가독성 재작업) */
+.todo-head { display: flex; justify-content: space-between; align-items: center; }
+.todo-head h2 { margin: 0; }
+.todo-grp { margin: 14px 0 4px; }
+.todo-grp-h { display: flex; align-items: baseline; gap: 8px; padding: 6px 0 4px; border-bottom: 2px solid #e5e7eb; }
+.todo-grp-h b { font-size: 14px; }
+.todo-grp-h .cnt { font-size: 12px; color: #6b7280; }
+.todo-grp-h .go { margin-left: auto; font-size: 12px; }
+.todo-grp-h.over { border-color: #f3b6b6; }
+.todo-grp-h.over b { color: #b62222; }
+.todo { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: start;
+        padding: 9px 6px; border-bottom: 1px solid #f1f3f5; font-size: 14px; line-height: 1.5; }
+.todo:hover { background: #fafbfc; }
 .todo:last-child { border-bottom: 0; }
-.todo input[type=checkbox] { margin-top: 3px; }
-.todo .t { flex: 1; }
+.todo input[type=checkbox] { width: 18px; height: 18px; margin: 3px 0 0; accent-color: #1b64da; }
+.todo .t { color: #16181d; }
+.todo .t .src { display: block; font-size: 12px; color: #8f93a3; margin-top: 2px; }
 .todo.done .t { color: #9ca3af; text-decoration: line-through; }
-.todo.hid .t { color: #9ca3af; font-style: italic; }
-.todo .due { font-size: 12px; color: #6b7280; white-space: nowrap; }
-.todo .due.over { color: #b62222; font-weight: 600; }
-.todo .src { font-size: 12px; color: #6b7280; }
-.todo .src button { font-size: 11px; padding: 0 6px; }
-.todo-mtg { margin: 6px 0; }
-.todo-mtg summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
-.todo-mtg summary .meta { margin-left: 6px; }
+.todo.hid .t { color: #9ca3af; }
+.todo .due { font-size: 12px; color: #6b7280; white-space: nowrap; padding: 2px 8px; border-radius: 10px; background: #f1f2f3; margin-top: 2px; }
+.todo .due.over { color: #b62222; background: #fdecec; font-weight: 500; }
+.todo .hide { font-size: 12px; color: #9ca3af; background: none; border: 0; padding: 2px 4px; cursor: pointer; margin-top: 2px; }
+.todo .hide:hover { color: #16181d; text-decoration: underline; }
 #d-cal table { max-width: 720px; }
 #d-cal th { width: 110px; }
 

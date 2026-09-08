@@ -693,36 +693,44 @@ else {
 }
 
 // ------------------------------------------------------------------ 할 일 (스펙 5단계)
+// 한 줄 = 체크박스 + 문장. 회의 단위로 묶어 훑기 쉽게. 기한 지난 것은 맨 위에 따로 모은다 (2026-09-08 가독성 재작업)
 let TODOS = null;
 function todoRow(a, withSrc) {
   const cls = 'todo' + (a.done ? ' done' : '') + (a.hidden ? ' hid' : '');
-  const due = a.due ? `<span class="due${a.overdue ? ' over' : ''}">${a.overdue ? '기한 지남 · ' : ''}${esc(a.due)}</span>` : '';
-  const src = withSrc ? `<span class="src"><button class="small go" data-folder="${esc(a.folder)}">${esc(a.folder.slice(0, 10))} ${esc(a.title || '')}</button></span>` : '';
+  const due = a.due ? `<span class="due${a.overdue ? ' over' : ''}">${a.overdue ? '기한 지남 · ' : ''}${esc(a.due)}</span>` : '<span></span>';
+  const src = withSrc ? `<span class="src">${esc(a.folder.slice(0, 10))} · ${esc(a.title || a.folder)}</span>` : '';
   return `<div class="${cls}" data-folder="${esc(a.folder)}" data-n="${a.n}">
-    <input type="checkbox" class="done" ${a.done ? 'checked' : ''} title="완료">
-    <span class="t">${esc(a.text)}</span>${due}${src}
-    <button class="small hide" title="${a.hidden ? '다시 표시' : '내 일 아님 (숨김)'}">${a.hidden ? '다시 표시' : '내 일 아님'}</button>
+    <input type="checkbox" class="done" ${a.done ? 'checked' : ''} title="완료로 표시">
+    <span class="t">${esc(a.text)}${src}</span>${due}
+    <button class="hide" title="${a.hidden ? '다시 표시' : '내 일이 아니면 숨기기'}">${a.hidden ? '다시 표시' : '숨기기'}</button>
   </div>`;
+}
+function todoGroup(head, cls, items, withSrc, folder) {
+  return `<div class="todo-grp"><div class="todo-grp-h ${cls}">${head}` +
+    (folder ? `<button class="small go" data-folder="${esc(folder)}">노트 열기</button>` : '') +
+    `</div>${items.map((a) => todoRow(a, withSrc)).join('')}</div>`;
 }
 function renderTodos() {
   if (!TODOS) return;
-  const showHidden = $('#todo-show-hidden').checked;
-  const open = [];
-  TODOS.folders.forEach((g) => g.items.forEach((a) => { if (!a.done && !a.hidden) open.push({ ...a, title: g.title }); }));
-  // 기한 지난 것 먼저, 그 다음 기한 있는 것, 나머지는 최근 회의 순
-  open.sort((x, y) => (y.overdue - x.overdue) || ((y.due_date ? 1 : 0) - (x.due_date ? 1 : 0)) || (x.due_date || '').localeCompare(y.due_date || ''));
-  $('#todo-open-n').textContent = `${open.length}건` + (TODOS.overdue ? ` · 기한 지남 ${TODOS.overdue}` : '');
-  $('#todo-open-list').innerHTML = open.length ? open.map((a) => todoRow(a, true)).join('') : '<div class="meta">안 한 일이 없습니다</div>';
-  $('#todo-by-list').innerHTML = TODOS.folders.map((g) => {
-    const items = g.items.filter((a) => showHidden || !a.hidden);
-    if (!items.length) return '';
-    const left = items.filter((a) => !a.done && !a.hidden).length;
-    return `<details class="todo-mtg"${left ? ' open' : ''}><summary><b>${esc(g.date)}</b> ${esc(g.title)}
-      <span class="meta">${left ? `안 한 일 ${left}` : '전부 완료'} / ${items.length}</span>
-      <button class="small go" data-folder="${esc(g.folder)}">노트 열기</button></summary>${items.map((a) => todoRow(a, false)).join('')}</details>`;
-  }).join('') || '<div class="meta">확정된 노트가 없습니다</div>';
+  const showAll = $('#todo-show-all').checked;
+  const all = [];
+  TODOS.folders.forEach((g) => g.items.forEach((a) => all.push({ ...a, title: g.title })));
+  const open = all.filter((a) => !a.done && !a.hidden);
+  $('#todo-open-n').textContent = `안 한 일 ${open.length}건` + (TODOS.overdue ? ` · 기한 지남 ${TODOS.overdue}` : '') +
+    (showAll ? ` · 완료 ${TODOS.done} · 숨김 ${TODOS.hidden}` : '');
+  let html = '';
+  const over = open.filter((a) => a.overdue).sort((x, y) => (x.due_date || '').localeCompare(y.due_date || ''));
+  if (over.length) html += todoGroup(`<b>기한 지남</b><span class="cnt">${over.length}건</span>`, 'over', over, true, '');
+  TODOS.folders.forEach((g) => {
+    const items = g.items.filter((a) => showAll || (!a.done && !a.hidden)).filter((a) => showAll || !a.overdue);
+    if (!items.length) return;
+    const left = g.items.filter((a) => !a.done && !a.hidden).length;
+    html += todoGroup(`<b>${esc(g.date)}</b> ${esc(g.title)}<span class="cnt">${left ? `안 한 일 ${left}` : '전부 완료'} / ${g.items.length}</span>`,
+      '', items, false, g.folder);
+  });
+  $('#todo-list').innerHTML = html || '<div class="meta">안 한 일이 없습니다</div>';
   document.querySelectorAll('#panel-todo .go').forEach((b) =>
-    b.addEventListener('click', (ev) => { ev.preventDefault(); openDetail(b.dataset.folder); }));
+    b.addEventListener('click', () => openDetail(b.dataset.folder)));
   document.querySelectorAll('#panel-todo .todo .done').forEach((c) =>
     c.addEventListener('change', () => todoPost(c.closest('.todo'), { done: c.checked })));
   document.querySelectorAll('#panel-todo .todo .hide').forEach((b) =>
@@ -734,7 +742,7 @@ async function todoPost(row, body) {
   await loadTodos(); refresh();
 }
 async function loadTodos() { TODOS = await req('/api/todos'); renderTodos(); }
-$('#todo-show-hidden').addEventListener('change', renderTodos);
+$('#todo-show-all').addEventListener('change', renderTodos);
 document.querySelector('.toptab[data-panel="todo"]').addEventListener('click', loadTodos);
 
 refresh();
