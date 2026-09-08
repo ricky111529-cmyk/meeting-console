@@ -685,6 +685,12 @@ function shiftWeek(days) {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
+// 앱 안 콘솔 창은 다시 읽지 않고 해시만 바꿔 화면을 전환한다 (메뉴바 → 확인 필요 / 할 일)
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#todos') { showPanel('todo'); loadTodos(); }
+  else if (location.hash === '#review') { showPanel('calendar'); $('#card-review').scrollIntoView({ block: 'start' }); }
+  else if (location.hash === '#queue') showPanel('control');
+});
 if (location.hash === '#queue') showPanel('control');       // 1단계 목적지 (하위 호환)
 else if (location.hash === '#todos') { showPanel('todo'); loadTodos(); }   // 메뉴바 「안 한 일 N건」
 else {

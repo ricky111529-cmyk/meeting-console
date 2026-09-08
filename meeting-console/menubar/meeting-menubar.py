@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["rumps"]
+# dependencies = ["rumps", "pyobjc-framework-WebKit"]
 # ///
 """회의 파이프라인 메뉴바 앱 (meeting-console v2 1단계).
 
@@ -201,8 +201,8 @@ def start_server() -> tuple[bool, str]:
     return False, f"서버가 {SERVER_WAIT_SEC}초 안에 뜨지 않았습니다. 로그: {SERVER_LOG}"
 
 
-def open_console(fragment: str = "") -> tuple[bool, str]:
-    """콘솔을 브라우저로 연다. 서버가 없으면 띄운 뒤 연다 (스펙 5-1)."""
+def console_url(fragment: str = "") -> tuple[bool, str]:
+    """콘솔 주소. 서버가 없으면 띄운 뒤 돌려준다 (스펙 5-1). 토큰은 앱이 알고 있으니 사람이 복사할 일이 없다."""
     found = ms.find_console()
     if not found:
         ok, err = start_server()
@@ -212,9 +212,83 @@ def open_console(fragment: str = "") -> tuple[bool, str]:
     if not found:
         return False, f"서버 포트를 찾지 못했습니다. 로그: {SERVER_LOG}"
     port, token = found
-    url = f"http://127.0.0.1:{port}/?t={token}{fragment}"
-    subprocess.run(["open", url], capture_output=True)
-    return True, url
+    return True, f"http://127.0.0.1:{port}/?t={token}{fragment}"
+
+
+def open_console(fragment: str = "") -> tuple[bool, str]:
+    """콘솔을 기본 브라우저로 연다 (메뉴 「브라우저에서 열기」, 설치 마법사용)."""
+    ok, url = console_url(fragment)
+    if ok:
+        subprocess.run(["open", url], capture_output=True)
+    return ok, url
+
+
+# ---------------------------------------------------------------- 앱 안 콘솔 창 (WKWebView)
+
+PANEL_W, PANEL_H = 1200, 800
+
+
+class ConsolePanel:
+    """브라우저 대신 앱 안에 떠 있는 콘솔 창 (2026-09-08 사용자 요청).
+
+    떠 있는 패널(NSWindow, floating level)이다. 팝오버는 바깥을 누르면 닫히는데, 콘솔에서 오디오를
+    들으며 이름을 붙이는 동선이 있어 다른 창을 눌러도 남아 있어야 한다. 닫기(x)는 숨기기이고
+    다음에 열면 같은 창을 다시 보인다. 서버가 재시작돼 토큰이 바뀌면 새 주소로 다시 읽는다.
+    """
+
+    def __init__(self):
+        self._win = None
+        self._web = None
+        self._loaded_url = ""
+
+    def _build(self):
+        import AppKit, WebKit, Foundation
+        cfg = WebKit.WKWebViewConfiguration.alloc().init()
+        try:
+            cfg.setMediaTypesRequiringUserActionForPlayback_(0)   # 클립 재생 버튼이 바로 소리 나게
+        except Exception:                                          # noqa: BLE001
+            pass
+        screen = AppKit.NSScreen.mainScreen().visibleFrame()
+        w, h = min(PANEL_W, screen.size.width - 40), min(PANEL_H, screen.size.height - 40)
+        x = screen.origin.x + screen.size.width - w - 16
+        y = screen.origin.y + screen.size.height - h - 8
+        style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable |
+                 AppKit.NSWindowStyleMaskResizable | AppKit.NSWindowStyleMaskMiniaturizable)
+        win = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            Foundation.NSMakeRect(x, y, w, h), style, AppKit.NSBackingStoreBuffered, False)
+        win.setTitle_("회의 콘솔")
+        win.setReleasedWhenClosed_(False)            # x 를 눌러도 객체를 유지한다 (숨김)
+        win.setLevel_(AppKit.NSFloatingWindowLevel)  # 다른 창 위에 떠 있는다
+        win.setFrameAutosaveName_("meeting-console-panel")   # 옮긴 위치·크기를 기억한다
+        web = WebKit.WKWebView.alloc().initWithFrame_configuration_(win.contentView().bounds(), cfg)
+        web.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+        win.contentView().addSubview_(web)
+        self._win, self._web = win, web
+
+    def show(self, url: str) -> None:
+        import AppKit, Foundation
+        if self._win is None:
+            self._build()
+        base_new = url.split("#", 1)[0]
+        base_old = self._loaded_url.split("#", 1)[0]
+        if base_new != base_old:
+            # 처음이거나 토큰이 바뀐 경우: 새로 읽는다
+            req = Foundation.NSURLRequest.requestWithURL_(Foundation.NSURL.URLWithString_(url))
+            self._web.loadRequest_(req)
+            self._loaded_url = url
+        elif "#" in url:
+            # 같은 서버면 화면만 바꾼다 (다시 읽지 않아 보던 상태가 남는다)
+            frag = url.split("#", 1)[1]
+            self._web.evaluateJavaScript_completionHandler_(
+                f"location.hash = '#{frag}'; window.dispatchEvent(new HashChangeEvent('hashchange'));", None)
+        AppKit.NSApp.activateIgnoringOtherApps_(True)
+        self._win.makeKeyAndOrderFront_(None)
+
+    def toggle(self, url: str) -> None:
+        if self._win is not None and self._win.isVisible():
+            self._win.orderOut_(None)
+        else:
+            self.show(url)
 
 
 # ---------------------------------------------------------------- 동작
@@ -264,6 +338,8 @@ def main() -> int:
 
             self.item_status = rumps.MenuItem("상태 확인 중…")          # 클릭 불가
             self.item_open = rumps.MenuItem("콘솔 열기", callback=self.on_open)
+            self.item_browser = rumps.MenuItem("브라우저에서 열기", callback=self.on_browser)
+            self.panel = ConsolePanel()
             self.item_stop = rumps.MenuItem("지금 녹음 중지", callback=None)
             self.item_auto = rumps.MenuItem("자동 녹음", callback=self.on_auto)
             self.item_queue = rumps.MenuItem("확인 필요 없음", callback=None)
@@ -272,6 +348,7 @@ def main() -> int:
                 self.item_status,
                 None,
                 self.item_open,
+                self.item_browser,
                 self.item_stop,
                 self.item_auto,
                 self.item_queue,
@@ -347,24 +424,37 @@ def main() -> int:
 
         # ---- 메뉴 동작
 
+        def show_panel(self, fragment: str = ""):
+            ok, url = console_url(fragment)
+            if not ok:
+                rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", url)
+                return
+            try:
+                self.panel.show(url)
+            except Exception as exc:                 # noqa: BLE001
+                # 웹뷰가 안 되는 환경(프레임워크 없음 등)이면 브라우저로 넘긴다
+                ms.LOGS.mkdir(parents=True, exist_ok=True)
+                with (ms.LOGS / "menubar.log").open("a", encoding="utf-8") as fh:
+                    fh.write(f"{ms.now_iso()} 콘솔 창 실패, 브라우저로: {exc!r}\n")
+                subprocess.run(["open", url], capture_output=True)
+
         def on_open(self, _):
+            self.show_panel()
+
+        def on_browser(self, _):
             ok, msg = open_console()
             if not ok:
                 rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", msg)
 
         def on_todo(self, _):
-            ok, msg = open_console("#todos")
-            if not ok:
-                rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", msg)
+            self.show_panel("#todos")
 
         def on_queue(self, _):
             # 목적지는 캘린더 첫 화면의 「확인 필요」 영역이다 (기준 28 재정의, 스펙 8절).
             #  1단계에서는 제어판 #queue 였는데, 3단계에서 첫 화면이 캘린더로 바뀌면서
             #  #queue 로 열면 사람이 방금 본 화면을 두고 두 번째 탭으로 튕긴다.
             #  확인 필요 목록은 캘린더 위에도 있으므로 첫 화면에서 바로 집어 들 수 있다.
-            ok, msg = open_console("#review")
-            if not ok:
-                rumps.notification("회의 콘솔", "콘솔을 열지 못했습니다", msg)
+            self.show_panel("#review")
 
         def on_stop(self, _):
             """두 번 클릭으로 확인한다. **모달 대화상자를 쓰지 않는다.**
