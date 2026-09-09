@@ -106,6 +106,35 @@ def build_prompt(folder: str) -> str:
 
 # ---------------------------------------------------------------- 초안 생성
 
+CLAUDE_CANDIDATE_DIRS = ("/usr/local/bin", "/opt/homebrew/bin", str(Path.home() / ".local/bin"),
+                         str(Path.home() / ".npm-global/bin"))
+
+
+def find_claude() -> str:
+    """실제로 실행되는 claude 를 고른다.
+
+    2026-09-09 실사고: `~/.npm-global/bin/claude` 가 "native binary not installed" 만 찍는 껍데기(셔뱅 없음)라
+    Popen 이 Exec format error 를 냈고, 잡히지 않은 예외로 실패 기록 없이 5분마다 393번 재시도했다.
+    PATH 순서를 믿지 않고 후보마다 `--version` 을 돌려 되는 것을 쓴다.
+    """
+    cands = []
+    w = shutil.which("claude")
+    if w:
+        cands.append(w)
+    for d in CLAUDE_CANDIDATE_DIRS:
+        c = str(Path(d) / "claude")
+        if c not in cands and Path(c).exists():
+            cands.append(c)
+    for c in cands:
+        try:
+            r = subprocess.run([c, "--version"], capture_output=True, text=True, timeout=20)
+            if r.returncode == 0 and "Claude Code" in (r.stdout + r.stderr):
+                return c
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+    return ""
+
+
 def run_draft(folder: str, timeout: int, dry_run: bool = False) -> dict:
     """claude -p 를 부른다. 결과를 review.json 에 적고 그 내용을 돌려준다."""
     d = ms.MEETINGS / folder
@@ -124,7 +153,7 @@ def run_draft(folder: str, timeout: int, dry_run: bool = False) -> dict:
     started_ts = time.time()
     rel_log = str(log_file.relative_to(ms.REPO)) if log_file.is_relative_to(ms.REPO) else str(log_file)
 
-    claude_bin = shutil.which("claude")
+    claude_bin = find_claude()
     if not claude_bin:
         # 스펙 3-2: claude 가 없는 맥에서는 초안 단계를 통째로 건너뛴다. STT 까지는 정상 동작한다.
         log(f"실패: {folder} - claude 명령을 찾지 못했다 (PATH 확인)")
@@ -153,9 +182,18 @@ def run_draft(folder: str, timeout: int, dry_run: bool = False) -> dict:
         fh.write(f"# 명령: claude -p <프롬프트 {len(prompt)}자> "
                  f"--allowedTools {CLAUDE_TOOLS} --permission-mode acceptEdits\n\n")
         fh.flush()
-        proc = subprocess.Popen(cmd, cwd=str(ms.REPO), stdout=fh,
-                                stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                start_new_session=True)
+        try:
+            proc = subprocess.Popen(cmd, cwd=str(ms.REPO), stdout=fh,
+                                    stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                    start_new_session=True)
+        except OSError as exc:
+            # 실행 자체가 안 되는 경우(깨진 링크·권한). 기록하지 않으면 다음 회차마다 똑같이 반복한다
+            fh.write(f"\n[watcher] claude 를 실행할 수 없습니다: {exc}\n")
+            log(f"실패: {folder} - claude 실행 불가 ({exc})")
+            return ms.write_review(folder, {
+                "status": "failed", "reason": f"claude 실행 불가: {exc}",
+                "decided_at": ms.now_iso(),
+                "draft": {"started": started, "finished": ms.now_iso(), "exit": -1, "log": rel_log, "seconds": 0}})
         try:
             code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:

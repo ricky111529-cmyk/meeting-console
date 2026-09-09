@@ -136,7 +136,7 @@ sed -e "s|__UV__|$UV|g" -e "s|__UVBIN__|$UVBIN|g" -e "s|__REPO__|$ROOT|g" \
 # claude 명령이 PATH 밖(npm 전역 등)에 있으면 launchd 워처가 못 찾아 초안 단계가 통째로 실패한다 (2026-09-04 실측: ~/.npm-global/bin)
 CLAUDE_BIN_DIR="$(dirname "$(command -v claude 2>/dev/null || echo /usr/local/bin/claude)")"
 sed -e "s|__UV__|$UV|g" -e "s|__CONSOLE__|$CONSOLE|g" -e "s|__REPO__|$ROOT|g" \
-    -e "s|__PATH__|$UVBIN:$CLAUDE_BIN_DIR:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin|g" \
+    -e "s|__PATH__|$UVBIN:$CLAUDE_BIN_DIR:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin|g" \
     "$ROOT/scripts/com.meeting-console.meeting-console-watcher.plist.template" \
     > "$LA/com.meeting-console.meeting-console-watcher.plist"
 
