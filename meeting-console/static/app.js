@@ -611,11 +611,18 @@ function showPanel(name) {
 }
 
 // ------------------------------------------------------------------ 배선
+// 주간 칸은 5초 상태 갱신과 별개로 그려져서, 앱 안 콘솔 창처럼 페이지가 오래 살아 있으면 아침에
+//  그린 「녹음 예정」이 녹음이 끝난 뒤에도 남았다 (2026-09-09 실사용). 1분마다, 그리고 창을 다시 볼 때
+//  캐시 기준으로 다시 그린다 (force 아님: ICS 를 다시 받지 않고 폴더 상태만 다시 계산한다).
+let WEEK_TICK = 0;
 async function refresh() {
   STATE = await req('/api/state');
   renderNow(STATE); renderToday(STATE.today); renderReviewQueue(STATE);
   renderQueue(STATE); renderDiag(STATE.diagnostics);
+  if (++WEEK_TICK % 12 === 0 && !CUR) loadWeek(WEEK_START);
 }
+window.addEventListener('focus', () => { if (!CUR) loadWeek(WEEK_START); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !CUR) loadWeek(WEEK_START); });
 
 $('#btn-stop').addEventListener('click', async () => {
   $('#btn-stop').disabled = true;
