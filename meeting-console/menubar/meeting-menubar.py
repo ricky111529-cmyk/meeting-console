@@ -49,7 +49,7 @@ SERVER_PY = CONSOLE / "server.py"
 SERVER_LOG = ms.LOGS / "menubar-server.log"
 RECORDER_LABEL = "com.meeting-console.meeting-recorder"
 
-STOP_CONFIRM_SEC = 6                 # 「지금 녹음 중지」 두 번 클릭 확인 유효 시간
+STOP_CONFIRM_SEC = 12                # 「지금 녹음 중지」 두 번 클릭 확인 유효 시간
 TICK_SEC = 10                       # 녹음 중 갱신 주기 (스펙 3-2)
 SLOW_SEC = 60                       # 녹음 중이 아닐 때 갱신 주기
 SCHEDULE_TTL = 300                  # 일정 캐시 5분 (스펙 3-2)
@@ -467,6 +467,10 @@ def main() -> int:
             if now - getattr(self, "_stop_armed", 0) > STOP_CONFIRM_SEC:
                 self._stop_armed = now
                 self.item_stop.title = f"⚠ 정말 중지할까요? {STOP_CONFIRM_SEC}초 안에 다시 클릭"
+                # 메뉴 항목을 누르면 메뉴가 닫혀서 바뀐 글자를 못 본다 (2026-09-10 실사용: 한 번 누르고
+                #  중지된 줄 알았음). 알림으로 다음 동작을 알려 준다
+                rumps.notification("회의 콘솔", "아직 중지되지 않았습니다",
+                                   f"메뉴를 다시 열어 「지금 녹음 중지」를 {STOP_CONFIRM_SEC}초 안에 한 번 더 누르세요")
                 rumps.Timer(self._disarm_stop, STOP_CONFIRM_SEC + 0.5).start()
                 return
             self._stop_armed = 0
