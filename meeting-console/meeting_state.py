@@ -661,22 +661,28 @@ def notify(title: str, message: str) -> None:
 
 
 # ---------------------------------------------------------------- 할 일 (확정 노트의 액션 아이템)
-# 노트에는 담당 열이 없다 (템플릿 규칙 7, 2026-08-13). 그래서 "내 것"을 자동으로 가르지 않고
-#  확정 노트의 액션을 전부 올린 뒤, 내 일이 아닌 것은 사람이 숨긴다. 완료 여부는 **노트의 상태 열에
-#  직접 쓴다** (노트 파일이 정본. Confluence 에 올려도 같이 간다). 숨김 표시만 여기 상태 파일에 둔다.
+# 노트의 액션 표에 담당 열이 생겼다 (템플릿 규칙 7, 2026-09-14. 그 전엔 담당 열 금지라 전부 올라왔고
+#  남의 일을 사람이 하나씩 숨겨야 했다). 열 위치는 머리 행 이름으로 찾는다 (옛 노트는 4열, 새 노트는 5열).
+#  "내 것" 판정: 설정 `me`(내 이름)가 비어 있으면 전부 내 것. 있으면 담당이 비었거나(미기재) 내 이름을
+#  포함하면 내 것, 다른 이름이면 남의 것 → 기본 화면·집계·메뉴바 건수에서 빠진다. 「추정: 이름 (근거)」도
+#  같은 규칙이다. 완료 여부는 **노트의 상태 열에 직접 쓴다** (노트 파일이 정본). 숨김·설정만 여기 상태 파일에.
 TODOS_FILE = STATE_DIR / "todos.json"
 ACTION_HEADING = "## 액션 아이템"
 DONE_WORDS = ("완료",)
 DROP_WORDS = ("안 함", "안함", "취소")     # 하기로 했다가 안 하기로 바뀐 것. 결정이라 노트 상태 열에 남긴다
+GUESS_PREFIX = "추정"                       # 담당 열의 「추정: 이름 (근거)」 표기
+# 머리 행 이름 → 역할. 이름이 다르거나 머리 행이 없으면 옛 4열 순서(할 일·기한·상태)로 본다
+COL_NAMES = {"할 일": "text", "할일": "text", "담당": "owner", "기한": "due", "상태": "status"}
+DEFAULT_COLS = {"text": 1, "due": 2, "status": 3}
 
 
-def _action_rows(lines: list[str]) -> list[int]:
-    """notes.md 줄 목록에서 액션 아이템 표의 데이터 행 번호(0-based)를 순서대로 돌려준다."""
+def _action_table(lines: list[str]) -> tuple[dict, list[int]]:
+    """notes.md 줄 목록에서 액션 아이템 표의 (열 역할→인덱스, 데이터 행 번호 목록)을 돌려준다."""
     try:
         start = next(i for i, l in enumerate(lines) if l.strip() == ACTION_HEADING)
     except StopIteration:
-        return []
-    rows, seen_header = [], False
+        return dict(DEFAULT_COLS), []
+    rows, cols, seen_header = [], None, False
     for i in range(start + 1, len(lines)):
         l = lines[i].strip()
         if l.startswith("## "):
@@ -685,11 +691,32 @@ def _action_rows(lines: list[str]) -> list[int]:
             continue
         if not seen_header:                      # 첫 표 행은 머리, 그 다음은 구분선
             seen_header = True
+            found = {COL_NAMES[c]: k for k, c in enumerate(_cells(l)) if c in COL_NAMES}
+            cols = found if "text" in found else dict(DEFAULT_COLS)
             continue
         if set(l.replace("|", "").strip()) <= set("-: "):
             continue
         rows.append(i)
-    return rows
+    return (cols or dict(DEFAULT_COLS)), rows
+
+
+def _action_rows(lines: list[str]) -> list[int]:
+    return _action_table(lines)[1]
+
+
+def _col(c: list[str], cols: dict, role: str) -> str:
+    k = cols.get(role)
+    return c[k].strip() if k is not None and k < len(c) else ""
+
+
+def is_mine(owner: str, me: str) -> bool:
+    """담당 문자열이 내 것인가. 내 이름 설정이 없으면 전부 내 것. 담당이 비면(미기재) 내 것으로 본다."""
+    if not me:
+        return True
+    o = (owner or "").strip()
+    if o in ("", "-", "(미기입)"):
+        return True
+    return me in o
 
 
 def _cells(line: str) -> list[str]:
@@ -703,21 +730,30 @@ def read_actions(folder: str) -> list[dict]:
     if not path.exists():
         return []
     lines = path.read_text(encoding="utf-8").splitlines()
-    hidden = read_json(TODOS_FILE, {}).get("hidden", {})
+    st = read_json(TODOS_FILE, {}) or {}
+    hidden = st.get("hidden", {})
+    me = str(st.get("me", "") or "").strip()
+    cols, rows = _action_table(lines)
+    has_owner_col = "owner" in cols
     out = []
-    for n, i in enumerate(_action_rows(lines), start=1):
+    for n, i in enumerate(rows, start=1):
         c = _cells(lines[i])
         if len(c) < 2:
             continue
-        text = c[1] if len(c) > 1 else ""
-        due = c[2] if len(c) > 2 else ""
-        status = c[3] if len(c) > 3 else ""
+        text = _col(c, cols, "text")
+        due = _col(c, cols, "due")
+        status = _col(c, cols, "status")
+        owner = _col(c, cols, "owner")
         if not text or text in ("", "-"):
             continue
+        if owner in ("-", "(미기입)"):
+            owner = ""
         key = f"{folder}#{n}"
         out.append({"folder": folder, "n": n, "key": key, "text": text, "archived": is_archived(folder),
                     "due": "" if due in ("-", "(미기입)") else due,
                     "status": status or "대기",
+                    "owner": owner, "owner_guess": owner.startswith(GUESS_PREFIX),
+                    "has_owner_col": has_owner_col, "mine": is_mine(owner, me),
                     "done": any(w in status for w in DONE_WORDS),
                     "dropped": any(w in status for w in DROP_WORDS),
                     "hidden": bool(hidden.get(key))})
@@ -741,14 +777,15 @@ def set_action_status(folder: str, n: int, status: str) -> dict:
         return {"ok": False, "error": "확정 노트가 없습니다"}
     with path_lock(path):
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        rows = _action_rows([l.rstrip("\n") for l in lines])
+        cols, rows = _action_table([l.rstrip("\n") for l in lines])
         if n < 1 or n > len(rows):
             return {"ok": False, "error": f"액션 {n}번이 없습니다"}
         i = rows[n - 1]
         c = _cells(lines[i])
-        while len(c) < 4:
+        k = cols.get("status", DEFAULT_COLS["status"])
+        while len(c) <= k:
             c.append("")
-        c[3] = status
+        c[k] = status
         nl = "\n" if lines[i].endswith("\n") else ""
         lines[i] = "| " + " | ".join(c) + " |" + nl
         path.write_text("".join(lines), encoding="utf-8")
@@ -770,7 +807,7 @@ def set_action_hidden(folder: str, n: int, hidden: bool) -> dict:
 def todo_settings() -> dict:
     """할 일 탭 설정. archive_before: 이 날짜(YYYY-MM-DD) 이전 회의의 액션은 「보관」으로 접고 집계에서 뺀다."""
     d = read_json(TODOS_FILE, {}) or {}
-    return {"archive_before": d.get("archive_before", "")}
+    return {"archive_before": d.get("archive_before", ""), "me": str(d.get("me", "") or "")}
 
 
 def set_todo_settings(patch: dict) -> dict:
@@ -780,8 +817,12 @@ def set_todo_settings(patch: dict) -> dict:
         if v and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
             return {"ok": False, "error": "날짜는 YYYY-MM-DD 형식"}
         d["archive_before"] = v
+    if "me" in patch:
+        # 내 이름. 담당 열에서 내 것을 가르는 기준. 비우면 전부 내 것으로 본다 (팀 번들 기본값)
+        d["me"] = str(patch["me"] or "").strip()[:40]
     write_json(TODOS_FILE, d)
-    return {"ok": True, "message": "보관 기준: " + (d.get("archive_before") or "없음")}
+    return {"ok": True, "message": "보관 기준: " + (d.get("archive_before") or "없음") +
+            " · 내 이름: " + (d.get("me") or "없음(전부 표시)")}
 
 
 def is_archived(folder: str) -> bool:

@@ -717,6 +717,8 @@ function todoRow(a, withSrc) {
   if (a.dropped) due = '<span class="due drop">안 하기로 함</span>';
   else if (a.hidden) due = '<span class="due">할 일 아님</span>';
   const src = withSrc ? `<span class="src">${esc(a.folder.slice(0, 10))} · ${esc(a.title || a.folder)}</span>` : '';
+  // 담당 태그. 「추정: 이름 (근거)」는 흐리게, 남의 일은 붉은 테두리 없이 회색으로 (2026-09-14)
+  const own = a.owner ? `<span class="own${a.owner_guess ? ' guess' : ''}${a.mine ? '' : ' other'}" title="${a.owner_guess ? '원문 발화가 아니라 근거로 추정한 담당' : '원문 발화로 확인된 담당'}">${esc(a.owner)}</span>` : '';
   let acts;
   if (a.hidden) acts = '<button class="act" data-act="unhide">다시 표시</button>';
   else if (a.dropped) acts = '<button class="act" data-act="reopen">되돌리기</button>';
@@ -724,7 +726,7 @@ function todoRow(a, withSrc) {
               '<button class="act" data-act="drop" title="하기로 했다가 안 하기로 바뀜 (노트에 「안 함」으로 남습니다)">안 하기로 함</button>';
   return `<div class="${cls}" data-folder="${esc(a.folder)}" data-n="${a.n}">
     <input type="checkbox" class="done" ${a.done ? 'checked' : ''} ${a.dropped || a.hidden ? 'disabled' : ''} title="완료로 표시">
-    <span class="t">${esc(a.text)}${src}</span>${due}
+    <span class="t">${esc(a.text)}${own}${src}</span>${due}
     <span class="acts">${acts}</span>
   </div>`;
 }
@@ -736,20 +738,25 @@ function todoGroup(head, cls, items, withSrc, folder) {
 function renderTodos() {
   if (!TODOS) return;
   const showAll = $('#todo-show-all').checked;
+  const showOthers = $('#todo-show-others').checked;
   const all = [];
-  TODOS.folders.forEach((g) => g.items.forEach((a) => all.push({ ...a, title: g.title })));
-  const open = all.filter((a) => !a.done && !a.dropped && !a.hidden && !a.archived);
+  // 남의 일(담당이 다른 사람)은 토글을 켤 때만 목록에 들어온다. 내 이름 설정이 비면 전부 내 일 (2026-09-14)
+  TODOS.folders.forEach((g) => g.items.forEach((a) => { if (a.mine || showOthers) all.push({ ...a, title: g.title }); }));
+  const open = all.filter((a) => a.mine && !a.done && !a.dropped && !a.hidden && !a.archived);
   $('#todo-archive-before').value = (TODOS.settings || {}).archive_before || '';
+  if (document.activeElement !== $('#todo-me')) $('#todo-me').value = (TODOS.settings || {}).me || '';
   $('#todo-open-n').textContent = `안 한 일 ${open.length}건` + (TODOS.overdue ? ` · 기한 지남 ${TODOS.overdue}` : '') +
+    (TODOS.others_open && !showOthers ? ` · 남의 일 ${TODOS.others_open}건 숨김` : '') +
     (showAll ? ` · 완료 ${TODOS.done} · 안 하기로 함 ${TODOS.dropped} · 할 일 아님 ${TODOS.hidden}` : '');
   let html = '';
   const over = open.filter((a) => a.overdue).sort((x, y) => (x.due_date || '').localeCompare(y.due_date || ''));
   if (over.length) html += todoGroup(`<b>기한 지남</b><span class="cnt">${over.length}건</span>`, 'over', over, true, '');
   const archived = TODOS.folders.filter((g) => g.items.some((a) => a.archived));
   TODOS.folders.filter((g) => !g.items.some((a) => a.archived)).forEach((g) => {
-    const items = g.items.filter((a) => showAll || (!a.done && !a.dropped && !a.hidden)).filter((a) => showAll || !a.overdue);
+    const items = g.items.filter((a) => a.mine || showOthers)
+      .filter((a) => showAll || (!a.done && !a.dropped && !a.hidden)).filter((a) => showAll || !a.overdue);
     if (!items.length) return;
-    const left = g.items.filter((a) => !a.done && !a.dropped && !a.hidden).length;
+    const left = g.items.filter((a) => a.mine && !a.done && !a.dropped && !a.hidden).length;
     html += todoGroup(`<b>${esc(g.date)}</b> ${esc(g.title)}<span class="cnt">${left ? `안 한 일 ${left}` : '전부 완료'} / ${g.items.length}</span>`,
       '', items, false, g.folder);
   });
@@ -758,7 +765,7 @@ function renderTodos() {
     const ab = (TODOS.settings || {}).archive_before || '';
     html += `<details class="todo-archive"><summary><b>보관</b> <span class="cnt">${esc(ab)} 이전 회의 ${archived.length}개 · 안 한 일 ${TODOS.archived_open || 0}건 (집계에서 제외)</span></summary>` +
       archived.map((g) => {
-        const items = g.items.filter((a) => showAll || (!a.done && !a.dropped && !a.hidden));
+        const items = g.items.filter((a) => a.mine || showOthers).filter((a) => showAll || (!a.done && !a.dropped && !a.hidden));
         if (!items.length) return '';
         return todoGroup(`<b>${esc(g.date)}</b> ${esc(g.title)}<span class="cnt">${items.length}건</span>`, '', items, false, g.folder);
       }).join('') + '</details>';
@@ -782,6 +789,12 @@ async function todoPost(row, body) {
 }
 async function loadTodos() { TODOS = await req('/api/todos'); renderTodos(); }
 $('#todo-show-all').addEventListener('change', renderTodos);
+$('#todo-show-others').addEventListener('change', renderTodos);
+$('#todo-me').addEventListener('change', async (ev) => {
+  const r = await req('/api/todo-settings', { me: ev.target.value });
+  if (!r.ok) alert(r.error || '실패');
+  await loadTodos(); refresh();
+});
 $('#todo-archive-before').addEventListener('change', async (ev) => {
   const r = await req('/api/todo-settings', { archive_before: ev.target.value });
   if (!r.ok) alert(r.error || '실패');

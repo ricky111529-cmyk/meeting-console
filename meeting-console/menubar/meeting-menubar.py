@@ -228,6 +228,74 @@ def open_console(fragment: str = "") -> tuple[bool, str]:
 PANEL_W, PANEL_H = 1200, 800
 
 
+STOP_PANEL_SEC = 20                  # 확인 창이 스스로 닫히는 시간
+
+
+def make_stop_confirm():
+    """「지금 녹음 중지」확인 창. 메뉴 항목을 누르는 즉시 화면 오른쪽 위에 뜨는 작은 창.
+
+    모달(NSAlert)이 아니라 우리가 그리는 떠 있는 창이다. 다른 창 뒤에 숨지 않고(NSStatusWindowLevel),
+    메인 스레드를 막지 않으며, 20초 안에 답이 없으면 스스로 닫힌다. 2026-09-14 사용자 피드백:
+    메뉴 안에서만 바뀌는 확인 문구는 메뉴를 다시 열어 보지 않으면 없는 것과 같다.
+    PyObjC 클래스는 import 시점에 한 번만 만들어야 해서 함수로 감싼다.
+    """
+    import objc
+    import AppKit, Foundation
+
+    class StopConfirm(AppKit.NSObject):
+        def initWithTitle_onStop_(self, title, on_stop):
+            self = objc.super(StopConfirm, self).init()
+            if self is None:
+                return None
+            self.on_stop = on_stop
+            self.timer = None
+            w, h = 380, 130
+            screen = AppKit.NSScreen.mainScreen().visibleFrame()
+            x = screen.origin.x + screen.size.width - w - 16
+            y = screen.origin.y + screen.size.height - h - 8
+            style = AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskUtilityWindow
+            self.win = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                Foundation.NSMakeRect(x, y, w, h), style, AppKit.NSBackingStoreBuffered, False)
+            self.win.setTitle_("회의 콘솔")
+            self.win.setLevel_(AppKit.NSStatusWindowLevel)
+            self.win.setReleasedWhenClosed_(False)
+            self.win.setHidesOnDeactivate_(False)
+            v = self.win.contentView()
+            head = AppKit.NSTextField.labelWithString_("녹음을 지금 중지할까요?")
+            head.setFont_(AppKit.NSFont.boldSystemFontOfSize_(14)); head.setFrame_(Foundation.NSMakeRect(20, 88, w - 40, 22))
+            body = AppKit.NSTextField.labelWithString_(f"{title}\n중지하면 이 시점까지만 녹음됩니다. {STOP_PANEL_SEC}초 뒤 자동으로 닫힙니다.")
+            body.setFont_(AppKit.NSFont.systemFontOfSize_(12)); body.setTextColor_(AppKit.NSColor.secondaryLabelColor())
+            body.setFrame_(Foundation.NSMakeRect(20, 46, w - 40, 40))
+            stop = AppKit.NSButton.buttonWithTitle_target_action_("중지", self, "doStop:")
+            stop.setKeyEquivalent_("\r"); stop.setFrame_(Foundation.NSMakeRect(w - 110, 10, 90, 30))
+            cancel = AppKit.NSButton.buttonWithTitle_target_action_("계속 녹음", self, "doCancel:")
+            cancel.setKeyEquivalent_("\x1b"); cancel.setFrame_(Foundation.NSMakeRect(w - 220, 10, 100, 30))
+            for c in (head, body, stop, cancel):
+                v.addSubview_(c)
+            return self
+
+        def show(self):
+            import AppKit
+            AppKit.NSApp.activateIgnoringOtherApps_(True)
+            self.win.makeKeyAndOrderFront_(None)
+            self.timer = Foundation.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                STOP_PANEL_SEC, self, "doCancel:", None, False)
+
+        def close(self):
+            if self.timer is not None:
+                self.timer.invalidate(); self.timer = None
+            self.win.orderOut_(None)
+
+        def doStop_(self, sender):
+            self.close()
+            self.on_stop()
+
+        def doCancel_(self, sender):
+            self.close()
+
+    return StopConfirm
+
+
 class ConsolePanel:
     """브라우저 대신 앱 안에 떠 있는 콘솔 창 (2026-09-08 사용자 요청).
 
@@ -457,23 +525,26 @@ def main() -> int:
             self.show_panel("#review")
 
         def on_stop(self, _):
-            """두 번 클릭으로 확인한다. **모달 대화상자를 쓰지 않는다.**
+            """확인 창을 즉시 띄운다 (모달 아님, 메뉴 안 문구 아님).
 
-            2026-09-08 실사고: rumps.alert(NSAlert runModal) 가 다른 화면·창 뒤에 떠서 사용자가 못 봤고,
-            메뉴바는 답을 기다리며 23분간 굳었다(심박 15:32 정지, 제목 「남은 28분」 고정). 녹음은 계속됐다.
-            메뉴 항목 자체가 확인 단계가 되면 어디에도 숨을 창이 없다.
+            2026-09-08: rumps.alert(NSAlert runModal) 가 다른 창 뒤에 숨어 메뉴바가 23분 굳었다.
+            2026-09-10: 메뉴 항목 두 번 클릭 방식은 첫 클릭 뒤 메뉴가 닫혀 확인 문구를 못 봤다.
+            2026-09-14: 그래서 우리가 그리는 떠 있는 확인 창으로. 실패하면 두 번 클릭 방식으로 폴백.
             """
-            now = time.time()
-            if now - getattr(self, "_stop_armed", 0) > STOP_CONFIRM_SEC:
-                self._stop_armed = now
-                self.item_stop.title = f"⚠ 정말 중지할까요? {STOP_CONFIRM_SEC}초 안에 다시 클릭"
-                # 메뉴 항목을 누르면 메뉴가 닫혀서 바뀐 글자를 못 본다 (2026-09-10 실사용: 한 번 누르고
-                #  중지된 줄 알았음). 알림으로 다음 동작을 알려 준다
-                rumps.notification("회의 콘솔", "아직 중지되지 않았습니다",
-                                   f"메뉴를 다시 열어 「지금 녹음 중지」를 {STOP_CONFIRM_SEC}초 안에 한 번 더 누르세요")
-                rumps.Timer(self._disarm_stop, STOP_CONFIRM_SEC + 0.5).start()
-                return
-            self._stop_armed = 0
+            rec = self._snap.get("recording") or {}
+            name = rec.get("title") or rec.get("folder") or "지금 녹음"
+            try:
+                if getattr(self, "_stop_confirm_cls", None) is None:
+                    self._stop_confirm_cls = make_stop_confirm()
+                self._stop_confirm = self._stop_confirm_cls.alloc().initWithTitle_onStop_(name, self._do_stop)
+                self._stop_confirm.show()
+            except Exception as exc:                 # noqa: BLE001
+                ms.LOGS.mkdir(parents=True, exist_ok=True)
+                with (ms.LOGS / "menubar.log").open("a", encoding="utf-8") as fh:
+                    fh.write(f"{ms.now_iso()} 확인 창 실패, 두 번 클릭으로: {exc!r}\n")
+                self._on_stop_two_click()
+
+        def _do_stop(self):
             self.item_stop.title = "중지하는 중…"
             self.item_stop.set_callback(None)
 
@@ -483,6 +554,18 @@ def main() -> int:
                 rumps.notification("회의 콘솔", "", res.get("message") or res.get("error") or "")
                 self.refresh(force=True)
             threading.Thread(target=work, daemon=True).start()
+
+        def _on_stop_two_click(self):
+            now = time.time()
+            if now - getattr(self, "_stop_armed", 0) > STOP_CONFIRM_SEC:
+                self._stop_armed = now
+                self.item_stop.title = f"⚠ 정말 중지할까요? {STOP_CONFIRM_SEC}초 안에 다시 클릭"
+                rumps.notification("회의 콘솔", "아직 중지되지 않았습니다",
+                                   f"메뉴를 다시 열어 「지금 녹음 중지」를 {STOP_CONFIRM_SEC}초 안에 한 번 더 누르세요")
+                rumps.Timer(self._disarm_stop, STOP_CONFIRM_SEC + 0.5).start()
+                return
+            self._stop_armed = 0
+            self._do_stop()
 
         def _disarm_stop(self, timer):
             timer.stop()

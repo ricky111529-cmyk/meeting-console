@@ -154,6 +154,10 @@ button.chip.locked { background: #f2f3f5; border-color: #dfe2e6; color: #6b7280;
 .todo input[type=checkbox] { width: 18px; height: 18px; margin: 3px 0 0; accent-color: #1b64da; }
 .todo .t { color: #16181d; }
 .todo .t .src { display: block; font-size: 12px; color: #8f93a3; margin-top: 2px; }
+.todo .t .own { display: inline-block; font-size: 11px; color: #3b4a6b; background: #eef2fa; border-radius: 8px; padding: 1px 7px; margin-left: 8px; vertical-align: 1px; }
+.todo .t .own.guess { color: #6b7280; background: #f1f2f3; font-style: italic; }
+.todo .t .own.other { color: #8f93a3; background: #f6f7f8; }
+.todo-tools input[type=text] { font-size: 12px; padding: 2px 6px; width: 90px; }
 .todo.done .t { color: #9ca3af; text-decoration: line-through; }
 .todo.hid .t { color: #9ca3af; }
 .todo .due { font-size: 12px; color: #6b7280; white-space: nowrap; padding: 2px 8px; border-radius: 10px; background: #f1f2f3; margin-top: 2px; }
