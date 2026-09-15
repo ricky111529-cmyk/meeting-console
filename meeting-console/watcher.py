@@ -47,6 +47,43 @@ def log(msg: str) -> None:
 
 # ---------------------------------------------------------------- 대상 판정
 
+# 일시 실패(로그인 풀림·네트워크)는 회의 내용과 무관하다. 영구 실패와 같이 두면 사람이 콘솔을 열기 전까지
+#  아무도 모른다 (2026-09-07 네트워크 끊김 1건, 2026-09-14~15 로그인 풀림 6건). 종류를 가르고, 알리고, 다시 시도한다.
+TRANSIENT_RETRY_SEC = 30 * 60
+TRANSIENT_MAX_RETRIES = 6            # 30분 × 6 = 3시간까지. 그 뒤엔 사람이 본다
+FAILURE_KINDS = {
+    "auth": ("로그인 필요", "claude 로그인이 풀렸습니다. 터미널에서 `claude /login` 을 실행하세요"),
+    "network": ("네트워크", "API 서버에 닿지 않습니다 (인터넷·DNS). 연결되면 30분 안에 다시 시도합니다"),
+    "other": ("실패", "초안 생성이 실패했습니다. 콘솔 제어판에서 로그를 확인하세요"),
+}
+
+
+def classify_failure(log_text: str) -> str:
+    t = log_text.lower()
+    if "not logged in" in t or "/login" in t or "authentication" in t or "invalid api key" in t:
+        return "auth"
+    if any(k in t for k in ("can't reach the api server", "enotfound", "etimedout", "econnreset",
+                            "fetch failed", "network error", "socket hang up", "econnrefused")):
+        return "network"
+    return "other"
+
+
+def _failed_review(folder: str, reason: str, draft_rec: dict, kind: str) -> dict:
+    """실패를 기록한다. 일시 실패는 재시도 시각과 횟수를 남기고, 종류가 바뀌거나 첫 실패일 때 알린다."""
+    prev = ms.read_review(folder)
+    retries = int(prev.get("retries", 0)) + (1 if prev.get("status") == "failed" else 0)
+    label, hint = FAILURE_KINDS.get(kind, FAILURE_KINDS["other"])
+    rec = {"status": "failed", "failure_kind": kind, "reason": f"[{label}] {reason}",
+           "decided_at": ms.now_iso(), "draft": draft_rec, "retries": retries}
+    transient = kind in ("auth", "network")
+    if transient and retries < TRANSIENT_MAX_RETRIES:
+        rec["retry_at"] = time.time() + TRANSIENT_RETRY_SEC
+    if prev.get("failure_kind") != kind or retries == 0:
+        title = ms.meeting_title(folder, ms.MEETINGS / folder)
+        ms.notify("회의 콘솔 · 노트 작성 실패", f"{title}: {hint}")
+    return ms.write_review(folder, rec)
+
+
 def eligible(folder: str, force: bool = False) -> tuple[bool, str]:
     """초안을 만들 대상인지. (대상 여부, 사유)
 
@@ -66,6 +103,9 @@ def eligible(folder: str, force: bool = False) -> tuple[bool, str]:
         if (d / ms.DRAFT_NAME).exists():
             return False, "이미 초안이 있음"
         if (d / ms.REVIEW_NAME).exists():
+            rv = ms.read_review(folder)
+            if rv.get("status") == "failed" and rv.get("retry_at") and time.time() >= float(rv["retry_at"]):
+                return True, f"일시 실패 재시도 ({FAILURE_KINDS.get(rv.get('failure_kind'), ('실패',))[0]}, {int(rv.get('retries', 0)) + 1}회차)"
             return False, "이미 판정이 있음 (review.json)"
 
     pending = ms.stt_in_progress(folder)
@@ -209,10 +249,7 @@ def run_draft(folder: str, timeout: int, dry_run: bool = False) -> dict:
 
     if timed_out:
         log(f"실패(시간 초과): {folder} ({timeout}초)")
-        return ms.write_review(folder, {
-            "status": "failed",
-            "reason": f"실패(시간 초과): {timeout}초 제한을 넘겨 프로세스를 종료했다",
-            "decided_at": ms.now_iso(), "draft": draft_rec})
+        return _failed_review(folder, f"실패(시간 초과): {timeout}초 제한을 넘겨 프로세스를 종료했다", draft_rec, "other")
 
     verdict = ms.read_json(verdict_file, None)
     has_draft = (d / ms.DRAFT_NAME).exists()
@@ -220,9 +257,12 @@ def run_draft(folder: str, timeout: int, dry_run: bool = False) -> dict:
     # 판정: 종료 코드가 0이 아니거나, 0인데 결과가 없으면 실패다 (스펙 3-2)
     if code != 0:
         log(f"실패: {folder} (exit {code}, {elapsed}초)")
-        return ms.write_review(folder, {
-            "status": "failed", "reason": f"claude 가 종료 코드 {code} 로 끝났다",
-            "decided_at": ms.now_iso(), "draft": draft_rec})
+        try:
+            tail = log_file.read_text(encoding="utf-8")[-4000:]
+        except OSError:
+            tail = ""
+        kind = classify_failure(tail)
+        return _failed_review(folder, f"claude 가 종료 코드 {code} 로 끝났다", draft_rec, kind)
 
     if verdict and verdict.get("verdict") == "not-internal-meeting":
         # 유형 판정에서 비대상. 초안이 있으면(규칙 위반) 지운다. 개인 대화가 초안으로 남으면 안 된다.
@@ -238,9 +278,7 @@ def run_draft(folder: str, timeout: int, dry_run: bool = False) -> dict:
 
     if not has_draft:
         log(f"실패: {folder} (종료 코드 0 인데 {ms.DRAFT_NAME} 가 없다)")
-        return ms.write_review(folder, {
-            "status": "failed", "reason": f"{ms.DRAFT_NAME} 가 생성되지 않았다",
-            "decided_at": ms.now_iso(), "draft": draft_rec})
+        return _failed_review(folder, f"{ms.DRAFT_NAME} 가 생성되지 않았다", draft_rec, "other")
 
     if not verdict:
         # 초안은 있는데 유형 판정 결과가 없다. 자동 방어선이 돌았는지 확인할 수 없으므로
