@@ -754,8 +754,10 @@ def read_actions(folder: str) -> list[dict]:
                     "status": status or "대기",
                     "owner": owner, "owner_guess": owner.startswith(GUESS_PREFIX),
                     "has_owner_col": has_owner_col, "mine": is_mine(owner, me),
-                    "done": any(w in status for w in DONE_WORDS),
-                    "dropped": any(w in status for w in DROP_WORDS),
+                    # 상태 열은 앞머리로 판정한다. "진행 중 (1명 9건 완료)" 처럼 설명에 '완료' 가 들어간 행이
+                    #  완료로 잡힌 실사례 (2026-09-15)
+                    "done": status.strip().startswith(DONE_WORDS),
+                    "dropped": status.strip().startswith(DROP_WORDS),
                     "hidden": bool(hidden.get(key))})
     return out
 
@@ -789,7 +791,19 @@ def set_action_status(folder: str, n: int, status: str) -> dict:
         nl = "\n" if lines[i].endswith("\n") else ""
         lines[i] = "| " + " | ".join(c) + " |" + nl
         path.write_text("".join(lines), encoding="utf-8")
+    _todo_audit(folder, n, f"status={status}")
     return {"ok": True, "message": f"{folder} 액션 {n}: {status}"}
+
+
+def _todo_audit(folder: str, n: int, change: str) -> None:
+    """할 일 상태 변경 기록. 2026-09-15: 사용자가 체크하지 않은 항목이 완료로 돼 있었는데 언제·무엇이 바꿨는지
+    알 수 없었다 (access.log 는 경로만 남김). 시각·폴더·번호·변경만 남긴다."""
+    try:
+        LOGS.mkdir(parents=True, exist_ok=True)
+        with (LOGS / "todo-audit.log").open("a", encoding="utf-8") as fh:
+            fh.write(f"{now_iso()} {folder} #{n} {change}\n")
+    except OSError:
+        pass
 
 
 def set_action_hidden(folder: str, n: int, hidden: bool) -> dict:
@@ -801,6 +815,7 @@ def set_action_hidden(folder: str, n: int, hidden: bool) -> dict:
     else:
         h.pop(key, None)
     write_json(TODOS_FILE, data)
+    _todo_audit(folder, n, f"hidden={hidden}")
     return {"ok": True, "message": f"{key}: {'숨김' if hidden else '다시 표시'}"}
 
 
