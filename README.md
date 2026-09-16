@@ -4,6 +4,12 @@
 
 **요구 사항: Apple Silicon 맥 (macOS 13+)**, Homebrew, Xcode Command Line Tools. Intel 맥과 다른 OS 는 지원하지 않는다 (STT 가 Apple MLX 를 쓴다).
 
+## 言語 / 언어
+
+STT · ノート下書き · ノート様式は日本語にも対応している。インストール時に `./install.sh --lang ja` を付ける(既定は韓国語)。後で変えるには `.claude/calendar-recorder/lang.txt` に `ja` または `ko` と書く。コンソール画面の文言は現在韓国語のみ(順次対応)。
+
+STT·노트 초안·노트 양식은 일본어도 지원한다. 설치할 때 `./install.sh --lang ja` 를 붙인다 (기본은 한국어). 나중에 바꾸려면 `.claude/calendar-recorder/lang.txt` 에 `ja` 또는 `ko` 를 쓴다. 콘솔 화면 문구는 아직 한국어만이다.
+
 ## 설치 안내
 
 맥 한 대에 각자 설치한다.

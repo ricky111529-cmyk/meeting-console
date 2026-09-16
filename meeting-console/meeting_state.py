@@ -60,6 +60,22 @@ CLIP_DIR = STATE_DIR / "clips"
 VOICES_BACKUP = STATE_DIR / "voices-backup"     # 등록부를 고치기 전 사본 (스펙 3-4)
 EXCLUDE_RULES = CONSOLE / "exclude-rules.json"
 PROMPT_FILE = CONSOLE / "prompts" / "draft-note.md"
+LANG_FILE = REPO / ".claude" / "calendar-recorder" / "lang.txt"   # ko(기본) · ja. install.sh --lang 이 쓴다
+
+
+def lang() -> str:
+    """노트·STT 언어. 파일이 없으면 ko. 2026-09-16: 일본어 사용자를 위해 언어를 설정으로 뺐다."""
+    try:
+        v = LANG_FILE.read_text(encoding="utf-8").strip().lower()
+    except OSError:
+        return "ko"
+    return v if v in ("ko", "ja") else "ko"
+
+
+def prompt_file() -> Path:
+    """언어별 초안 프롬프트. `draft-note.ja.md` 가 있으면 그것, 없으면 기본(한국어)."""
+    cand = PROMPT_FILE.with_name(f"{PROMPT_FILE.stem}.{lang()}{PROMPT_FILE.suffix}")
+    return cand if lang() != "ko" and cand.exists() else PROMPT_FILE
 
 
 # ---------------------------------------------------------------- 서버 토큰 (인스턴스별)
@@ -667,19 +683,22 @@ def notify(title: str, message: str) -> None:
 #  포함하면 내 것, 다른 이름이면 남의 것 → 기본 화면·집계·메뉴바 건수에서 빠진다. 「추정: 이름 (근거)」도
 #  같은 규칙이다. 완료 여부는 **노트의 상태 열에 직접 쓴다** (노트 파일이 정본). 숨김·설정만 여기 상태 파일에.
 TODOS_FILE = STATE_DIR / "todos.json"
-ACTION_HEADING = "## 액션 아이템"
-DONE_WORDS = ("완료",)
-DROP_WORDS = ("안 함", "안함", "취소")     # 하기로 했다가 안 하기로 바뀐 것. 결정이라 노트 상태 열에 남긴다
+ACTION_HEADINGS = ("## 액션 아이템", "## アクション項目")   # ko · ja
+DONE_WORDS = ("완료", "完了")
+DROP_WORDS = ("안 함", "안함", "취소", "しない", "中止", "取り消し")     # 하기로 했다가 안 하기로 바뀐 것. 결정이라 노트 상태 열에 남긴다
+GUESS_PREFIXES = ("추정", "推定")
 GUESS_PREFIX = "추정"                       # 담당 열의 「추정: 이름 (근거)」 표기
 # 머리 행 이름 → 역할. 이름이 다르거나 머리 행이 없으면 옛 4열 순서(할 일·기한·상태)로 본다
-COL_NAMES = {"할 일": "text", "할일": "text", "담당": "owner", "기한": "due", "상태": "status"}
+COL_NAMES = {"할 일": "text", "할일": "text", "담당": "owner", "기한": "due", "상태": "status",
+             "やること": "text", "担当": "owner", "期限": "due", "状態": "status"}
 DEFAULT_COLS = {"text": 1, "due": 2, "status": 3}
+STATUS_WORDS = {"ko": {"done": "완료", "wait": "대기", "drop": "안 함"}, "ja": {"done": "完了", "wait": "待機", "drop": "しない"}}
 
 
 def _action_table(lines: list[str]) -> tuple[dict, list[int]]:
     """notes.md 줄 목록에서 액션 아이템 표의 (열 역할→인덱스, 데이터 행 번호 목록)을 돌려준다."""
     try:
-        start = next(i for i, l in enumerate(lines) if l.strip() == ACTION_HEADING)
+        start = next(i for i, l in enumerate(lines) if l.strip() in ACTION_HEADINGS)
     except StopIteration:
         return dict(DEFAULT_COLS), []
     rows, cols, seen_header = [], None, False
@@ -750,9 +769,9 @@ def read_actions(folder: str) -> list[dict]:
             owner = ""
         key = f"{folder}#{n}"
         out.append({"folder": folder, "n": n, "key": key, "text": text, "archived": is_archived(folder),
-                    "due": "" if due in ("-", "(미기입)") else due,
-                    "status": status or "대기",
-                    "owner": owner, "owner_guess": owner.startswith(GUESS_PREFIX),
+                    "due": "" if due in ("-", "(미기입)", "(未記入)") else due,
+                    "status": status or STATUS_WORDS[lang()]["wait"],
+                    "owner": owner, "owner_guess": owner.startswith(GUESS_PREFIXES),
                     "has_owner_col": has_owner_col, "mine": is_mine(owner, me),
                     # 상태 열은 앞머리로 판정한다. "진행 중 (1명 9건 완료)" 처럼 설명에 '완료' 가 들어간 행이
                     #  완료로 잡힌 실사례 (2026-09-15)
@@ -772,8 +791,11 @@ def set_action_status(folder: str, n: int, status: str) -> dict:
     「안 함」은 "하기로 했다가 안 하기로 바뀜" 이라는 결정이므로 노트에 남긴다. 잘못 뽑힌 항목(할 일 아님)은
     노트를 고치지 않고 숨김 표시만 한다 (set_action_hidden). 두 뜻을 섞지 않는다 (2026-09-08 사용자 결정).
     """
-    if status not in ("완료", "대기", "안 함"):
+    # API 는 한국어 키(완료·대기·안 함)로 받는다. 노트에는 그 노트의 언어로 쓴다
+    key = {"완료": "done", "대기": "wait", "안 함": "drop"}.get(status)
+    if key is None:
         return {"ok": False, "error": f"허용되지 않는 상태: {status}"}
+    status = STATUS_WORDS[lang()][key]
     path = MEETINGS / folder / NOTES_NAME
     if not path.exists():
         return {"ok": False, "error": "확정 노트가 없습니다"}

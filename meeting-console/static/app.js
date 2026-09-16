@@ -129,7 +129,7 @@ function renderDiag(d) {
 // ------------------------------------------------------------------ 검수 화면
 // [?] 는 "확인 필요", (미기입) 은 "채우지 못한 칸" 표기다 (노트 템플릿 규칙).
 // 검수에서 놓치면 그대로 확정되므로 개수와 위치를 초안 위에 띄운다 (스펙 5-2).
-const MARKS = [{ key: '[?]', what: '확인 필요' }, { key: '(미기입)', what: '빈 칸' }];
+const MARKS = [{ key: '[?]', what: '확인 필요' }, { key: '(미기입)', what: '빈 칸' }, { key: '(未記入)', what: '빈 칸' }];
 
 function lineNo(text, pos) { return text.slice(0, pos).split('\n').length; }
 

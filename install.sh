@@ -3,6 +3,7 @@
 #
 #   ./install.sh          설치
 #   ./install.sh --check  사전 점검만 하고 끝낸다
+#   ./install.sh --lang ja  일본어 회의용 (STT·노트 초안·노트 양식이 일본어)
 #
 # 자동화되는 것만 여기서 한다. 사람 개입이 필요한 세 가지(마이크 권한 · Xcode CLT ·
 # ICS 발급)는 마지막에 뜨는 웹 마법사가 이어받는다. 터미널로 안내하면 어디까지 했는지
@@ -15,7 +16,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONSOLE="$ROOT/meeting-console"
 CHECK_ONLY=0
-[ "${1:-}" = "--check" ] && CHECK_ONLY=1
+LANG_CODE="ko"
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK_ONLY=1 ;;
+    --lang=*) LANG_CODE="${arg#--lang=}" ;;
+    --lang) ;;                           # 다음 인자에서 값을 받는다
+    ko|ja) LANG_CODE="$arg" ;;
+    *) echo "알 수 없는 인자: $arg (사용: ./install.sh [--check] [--lang ko|ja])" >&2; exit 2 ;;
+  esac
+done
+case "$LANG_CODE" in ko|ja) ;; *) echo "--lang 은 ko 또는 ja" >&2; exit 2 ;; esac
 
 ok()   { echo "  ✅ $*"; }
 no()   { echo "  ❌ $*"; }
@@ -129,6 +140,7 @@ UV="$(command -v uv)"
 UVBIN="$(dirname "$UV")"
 LA="$HOME/Library/LaunchAgents"
 mkdir -p "$LA" "$ROOT/.claude/calendar-recorder"
+echo "$LANG_CODE" > "$ROOT/.claude/calendar-recorder/lang.txt"     # STT·노트 언어 (ko|ja). 나중에 이 파일을 고쳐 바꿀 수 있다
 
 sed -e "s|__UV__|$UV|g" -e "s|__UVBIN__|$UVBIN|g" -e "s|__REPO__|$ROOT|g" \
     "$ROOT/scripts/com.meeting-console.meeting-recorder.plist.template" \

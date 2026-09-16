@@ -70,6 +70,9 @@ fi
 [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "날짜 형식은 YYYY-MM-DD: $DATE" >&2; exit 1; }
 
 command -v ffmpeg >/dev/null || { echo "ffmpeg 없음: brew install ffmpeg" >&2; exit 1; }
+# 언어: .claude/calendar-recorder/lang.txt (ko 기본 · ja). WHISPER_LANG 환경변수가 있으면 그것을 우선한다
+STT_LANG="${WHISPER_LANG:-$(cat "$REPO/.claude/calendar-recorder/lang.txt" 2>/dev/null | tr -d '[:space:]')}"
+: "${STT_LANG:=ko}"
 WHISPER="$(command -v mlx_whisper || true)"
 [ -n "$WHISPER" ] || { echo "mlx_whisper 없음: uv tool install mlx-whisper" >&2; exit 1; }
 
@@ -131,7 +134,7 @@ trap 'rm -f "$WAV"; rm -rf "$OUT"' EXIT
 #  --output-format 은 쉼표 목록을 받지 않는다 (txt,vtt → invalid choice 에러).
 "$WHISPER" "$WAV" \
   --model "$MODEL" \
-  --language ko \
+  --language "$STT_LANG" \
   --output-format all \
   --output-dir "$OUT" \
   --word-timestamps False \

@@ -135,7 +135,7 @@ def build_prompt(folder: str) -> str:
     if not sources:
         sources.append("  - (없음)")
 
-    text = ms.PROMPT_FILE.read_text(encoding="utf-8")
+    text = ms.prompt_file().read_text(encoding="utf-8")
     return (text
             .replace("{{FOLDER}}", folder)
             .replace("{{DIR}}", f"docs/meetings/{folder}/")

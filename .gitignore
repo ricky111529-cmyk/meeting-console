@@ -7,3 +7,4 @@ scripts/bin/
 scripts/models/
 .claude/calendar-recorder/
 .claude/voice-registry/
+.claude/calendar-recorder/lang.txt
