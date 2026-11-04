@@ -68,7 +68,7 @@ else no "brew 없음. ffmpeg 를 설치할 방법이 없습니다: https://brew.
 if command -v swiftc >/dev/null; then ok "swiftc $(command -v swiftc)"
 else no "swiftc 없음. 녹음기를 빌드할 수 없습니다. \`xcode-select --install\` 로 커맨드라인 도구를 먼저 설치하세요"; FAIL=1; fi
 if command -v claude >/dev/null; then ok "claude $(command -v claude)"
-else no "claude 없음. 초안 생성이 돌지 않습니다. Claude Code 를 먼저 설치하세요"; FAIL=1; fi
+else echo "   · claude 없음. 녹음·STT·화자 분리는 돌고, 노트 초안만 자동으로 안 생깁니다 (다른 AI 도구로 notes.draft.md 를 써도 콘솔에서 검수할 수 있습니다)"; fi
 
 if [ "$FAIL" != "0" ]; then
   echo; echo "❌ 사전 점검에서 막혔습니다. 위 항목을 해결하고 다시 실행하세요." >&2
